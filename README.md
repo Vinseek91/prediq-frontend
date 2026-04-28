@@ -28,7 +28,7 @@
 - 🌍 **Multi-market coverage** — 60+ stocks across 3 continents, 6 daily market events
 - ⚡ **Elite AI Analyst** with streaming NDJSON responses and agentic tool use
 - 🖼️ **Auto-generated signal cards** posted to Telegram and LinkedIn at market open/close
-- 📈 **Swarm intelligence engine** — 50 AI fish agents voting on every signal
+- 📈 **Swarm intelligence engine** — 2.4 million Miro Fish agents simulating investor behaviour on every signal
 
 ---
 
