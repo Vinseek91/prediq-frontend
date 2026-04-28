@@ -1449,7 +1449,7 @@ INSTRUCTIONS:
           asset:asset.label, asset_type:asset.type, price:asset.price,
           price_change_pct:asset.change, rsi:48+Math.random()*22,
           volume_ratio:0.8+Math.random()*2, news_sentiment:(Math.random()-0.4)*1.4,
-          social_buzz:(Math.random()-0.4)*1.2, n_agents:50000, n_ticks:5,
+          social_buzz:(Math.random()-0.4)*1.2, n_agents:2400000, n_ticks:5,
         }),
       });
       const data = await res.json();
