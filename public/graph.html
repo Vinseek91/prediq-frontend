@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PREDIQ — Market Graph</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#000;color:#e0e8f0;font-family:monospace;overflow:hidden;height:100vh;display:flex;flex-direction:column;}
+#hdr{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-bottom:1px solid rgba(0,255,65,0.2);background:#050d1a;flex-shrink:0;}
+#logo{font-size:13px;letter-spacing:4px;color:#00ff41;font-weight:700;}
+#logo span{color:#e0e8f0;}
+#btns{display:flex;gap:8px;align-items:center;}
+.btn{background:transparent;font-family:monospace;font-size:9px;letter-spacing:2px;padding:6px 12px;border-radius:3px;cursor:pointer;transition:all 0.2s;}
+#homeBtn{border:1px solid rgba(0,255,65,0.2);color:#3a6040;}
+#homeBtn:hover{border-color:#00ff41;color:#00ff41;}
+#handBtn{border:1px solid rgba(0,255,65,0.3);color:#00ff41;}
+#handBtn:hover{background:#001a10;}
+#handBtn.on{background:#001a10;border-color:#00ff41;color:#00ff88;}
+#voiceBtn{border:1px solid rgba(0,170,255,0.3);color:#00aaff;}
+#voiceBtn:hover{background:#001020;}
+#voiceBtn.on{background:#001020;border-color:#00aaff;color:#00ccff;animation:blink 1.5s infinite;}
+#modeLabel{font-size:8px;letter-spacing:2px;color:#3a6040;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.5;}}
+#main{flex:1;position:relative;overflow:hidden;}
+#gc{display:block;width:100%;height:100%;cursor:crosshair;pointer-events:all;position:relative;z-index:1;}
+#camBox{display:none;position:absolute;bottom:12px;right:12px;border:1px solid rgba(0,255,65,0.4);border-radius:6px;overflow:hidden;width:160px;height:120px;}
+#vid{width:160px;height:120px;object-fit:cover;transform:scaleX(-1);display:block;}
+#hc{position:absolute;top:0;left:0;width:160px;height:120px;pointer-events:none;}
+#camLabel{position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:8px;letter-spacing:1px;color:#00ff41;background:rgba(0,0,0,0.7);padding:3px;}
+#ftr{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid rgba(0,255,65,0.15);background:#050d1a;flex-shrink:0;}
+.fc{padding:8px 14px;border-right:1px solid rgba(0,255,65,0.1);}
+.fc:last-child{border-right:none;}
+.fl{font-size:8px;color:#3a6040;letter-spacing:2px;margin-bottom:3px;}
+.fv{font-size:12px;font-weight:700;color:#00ff41;}
+#tt{position:absolute;background:#050d1a;border:1px solid rgba(0,255,65,0.3);border-radius:4px;padding:8px 12px;font-size:10px;pointer-events:none;display:none;z-index:100;min-width:130px;}
+#gestureHud{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.75);border:1px solid rgba(0,255,65,0.25);border-radius:4px;padding:5px 14px;font-size:9px;letter-spacing:2px;color:#00ff41;pointer-events:none;display:none;z-index:50;}
+#liveTag{position:absolute;top:12px;left:12px;font-size:8px;letter-spacing:2px;color:#00ff41;background:rgba(0,0,0,0.6);border:1px solid rgba(0,255,65,0.2);padding:4px 10px;border-radius:3px;pointer-events:none;}
+#zoomTag{position:absolute;top:12px;right:12px;font-size:8px;letter-spacing:2px;color:#3a6040;background:rgba(0,0,0,0.6);border:1px solid rgba(0,255,65,0.1);padding:4px 10px;border-radius:3px;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div id="logo">PREDIQ <span>MARKET GRAPH</span></div>
+    <button class="btn" id="homeBtn" onclick="location.href='https://prediq.netlify.app'">← HOME</button>
+  </div>
+  <div style="font-size:9px;color:#3a6040;letter-spacing:2px;" id="assetCount">LIVE CORRELATION — LOADING...</div>
+  <div id="btns">
+    <span id="modeLabel">MOUSE MODE</span>
+    <button class="btn" id="handBtn">☝ HAND TRACKING</button>
+    <button class="btn" id="voiceBtn">🎤 VOICE CONTROL</button>
+  </div>
+</div>
+<div id="main">
+  <canvas id="gc"></canvas>
+  <div id="camBox">
+    <video id="vid" playsinline muted></video>
+    <canvas id="hc"></canvas>
+    <div id="camLabel">POINT=HOVER · PINCH=GRAB</div>
+  </div>
+  <div id="tt"></div>
+  <div id="gestureHud"></div>
+  <div id="liveTag">● LIVE</div>
+  <div id="zoomTag" id="zoomTag">ZOOM: 100%</div>
+</div>
+<div id="ftr">
+  <div class="fc"><div class="fl">NODE</div><div class="fv" id="fNode">--</div></div>
+  <div class="fc"><div class="fl">SIGNAL</div><div class="fv" id="fSig" style="color:#ffaa00;">--</div></div>
+  <div class="fc"><div class="fl">CHANGE</div><div class="fv" id="fChg">--</div></div>
+  <div class="fc"><div class="fl">CORRELATES WITH</div><div class="fv" id="fCor" style="font-size:10px;color:#3a6040;">--</div></div>
+  <div class="fc"><div class="fl">STATUS</div><div class="fv" id="fStatus" style="font-size:9px;color:#00aaff;">HOVER OR CLICK NODE</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script>
+const API = "https://prediq-time-machine-production.up.railway.app";
+const gc=document.getElementById('gc');
+const ctx=gc.getContext('2d');
+const mainEl=document.getElementById('main');
+
+function resize(){gc.width=mainEl.offsetWidth;gc.height=mainEl.offsetHeight;}
+resize();
+window.addEventListener('resize',resize);
+
+// ── NODES (live data will overwrite ch/sig) ───────────────────────────────────
+const N=[
+  // US Indices
+  {id:'SPX',   name:'S&P 500',    cl:'us',     ch:0, sig:'HOLD'},
+  {id:'NASDAQ',name:'Nasdaq',     cl:'us',     ch:0, sig:'HOLD'},
+  {id:'DOW',   name:'Dow Jones',  cl:'us',     ch:0, sig:'HOLD'},
+  // US Tech
+  {id:'NVIDIA',name:'NVIDIA',     cl:'tech',   ch:0, sig:'HOLD'},
+  {id:'META',  name:'META',       cl:'tech',   ch:0, sig:'HOLD'},
+  {id:'AAPL',  name:'Apple',      cl:'tech',   ch:0, sig:'HOLD'},
+  {id:'MSFT',  name:'Microsoft',  cl:'tech',   ch:0, sig:'HOLD'},
+  {id:'GOOGL', name:'Google',     cl:'tech',   ch:0, sig:'HOLD'},
+  {id:'TSLA',  name:'Tesla',      cl:'tech',   ch:0, sig:'HOLD'},
+  {id:'AMZN',  name:'Amazon',     cl:'tech',   ch:0, sig:'HOLD'},
+  // India
+  {id:'NIFTY50',name:'Nifty 50',  cl:'india',  ch:0, sig:'HOLD'},
+  {id:'SENSEX', name:'Sensex',    cl:'india',  ch:0, sig:'HOLD'},
+  {id:'TCS',    name:'TCS',       cl:'india',  ch:0, sig:'HOLD'},
+  {id:'INFY',   name:'Infosys',   cl:'india',  ch:0, sig:'HOLD'},
+  {id:'RELIANCE',name:'Reliance', cl:'india',  ch:0, sig:'HOLD'},
+  {id:'HDFC',   name:'HDFC Bank', cl:'india',  ch:0, sig:'HOLD'},
+  // Metals
+  {id:'GOLD',  name:'Gold',       cl:'metals', ch:0, sig:'HOLD'},
+  {id:'SILVER',name:'Silver',     cl:'metals', ch:0, sig:'HOLD'},
+  {id:'WTI',   name:'Oil WTI',    cl:'energy', ch:0, sig:'HOLD'},
+  {id:'BRENT', name:'Brent',      cl:'energy', ch:0, sig:'HOLD'},
+  // Crypto
+  {id:'BTC/USD',name:'Bitcoin',   cl:'crypto', ch:0, sig:'HOLD'},
+  {id:'ETH/USD',name:'Ethereum',  cl:'crypto', ch:0, sig:'HOLD'},
+  {id:'SOL/USD',name:'Solana',    cl:'crypto', ch:0, sig:'HOLD'},
+  {id:'BNB/USD',name:'BNB',       cl:'crypto', ch:0, sig:'HOLD'},
+  // Finance
+  {id:'JPM',   name:'JPMorgan',   cl:'finance',ch:0, sig:'HOLD'},
+  {id:'GS',    name:'Goldman',    cl:'finance',ch:0, sig:'HOLD'},
+  // LATAM
+  {id:'MELI',  name:'MercadoL',   cl:'latam',  ch:0, sig:'HOLD'},
+  {id:'SQM',   name:'SQM',        cl:'latam',  ch:0, sig:'HOLD'},
+  {id:'VALE',  name:'Vale',       cl:'latam',  ch:0, sig:'HOLD'},
+  {id:'IPSA',  name:'IPSA',       cl:'latam',  ch:0, sig:'HOLD'},
+];
+
+const E=[
+  ['SPX','NASDAQ',0.97],['SPX','DOW',0.95],['NASDAQ','DOW',0.90],
+  ['NVIDIA','NASDAQ',0.88],['META','NASDAQ',0.85],['AAPL','NASDAQ',0.92],
+  ['MSFT','NASDAQ',0.90],['GOOGL','NASDAQ',0.87],['TSLA','NASDAQ',0.75],
+  ['AMZN','NASDAQ',0.82],['NVIDIA','META',0.72],['AAPL','MSFT',0.85],
+  ['NIFTY50','TCS',0.82],['NIFTY50','INFY',0.80],['TCS','INFY',0.88],
+  ['NIFTY50','SENSEX',0.96],['RELIANCE','NIFTY50',0.75],['HDFC','NIFTY50',0.78],
+  ['GOLD','SILVER',0.92],['BTC/USD','ETH/USD',0.94],['BTC/USD','SOL/USD',0.85],
+  ['BTC/USD','BNB/USD',0.82],['BTC/USD','NASDAQ',0.55],
+  ['SPX','JPM',0.80],['DOW','JPM',0.82],['JPM','GS',0.88],
+  ['WTI','BRENT',0.97],['WTI','GOLD',0.45],
+  ['MELI','NASDAQ',0.65],['SQM','GOLD',0.55],['VALE','GOLD',0.60],
+  ['IPSA','SQM',0.70],
+];
+
+const CC={us:'#00ff41',tech:'#00aaff',india:'#ff9900',metals:'#ffd700',crypto:'#ff44aa',latam:'#ff6644',finance:'#44ffaa',energy:'#ffaa44'};
+const CP={
+  us:     {x:0.15,y:0.30},
+  tech:   {x:0.45,y:0.18},
+  india:  {x:0.80,y:0.32},
+  metals: {x:0.12,y:0.68},
+  energy: {x:0.35,y:0.60},
+  crypto: {x:0.55,y:0.78},
+  latam:  {x:0.82,y:0.72},
+  finance:{x:0.10,y:0.50},
+};
+
+// Init positions
+N.forEach(n=>{
+  const c=CP[n.cl];
+  n.x=(c.x+(Math.random()-0.5)*0.14)*gc.width;
+  n.y=(c.y+(Math.random()-0.5)*0.14)*gc.height;
+  n.vx=0;n.vy=0;
+});
+
+// ── ZOOM & PAN STATE ──────────────────────────────────────────────────────────
+let zoom=1, panX=0, panY=0;
+let lastTwoHandDist=null;
+
+// ── PARTICLE SYSTEM ───────────────────────────────────────────────────────────
+const particles=[];
+function spawnBurst(x,y,color){
+  for(let i=0;i<10;i++){
+    const angle=Math.random()*Math.PI*2;
+    const speed=2+Math.random()*4;
+    particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,
+      life:1,color:color||'#00ff88',size:2+Math.random()*2});
+  }
+}
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx;p.y+=p.vy;p.vx*=0.92;p.vy*=0.92;p.life-=0.04;
+    if(p.life<=0)particles.splice(i,1);
+  }
+}
+function drawParticles(){
+  particles.forEach(p=>{
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);
+    ctx.fillStyle=p.color+Math.floor(p.life*255).toString(16).padStart(2,'0');
+    ctx.fill();
+  });
+}
+
+// ── FINGER TRAIL ─────────────────────────────────────────────────────────────
+const trail=[];
+const TRAIL_LEN=18;
+function addTrail(x,y){
+  trail.push({x,y,age:0});
+  while(trail.length>TRAIL_LEN)trail.shift();
+  trail.forEach(t=>t.age++);
+}
+function drawTrail(){
+  if(trail.length<2)return;
+  for(let i=1;i<trail.length;i++){
+    const a=trail[i-1],b=trail[i];
+    const alpha=i/trail.length;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+    ctx.strokeStyle=`rgba(0,255,136,${alpha*0.7})`;
+    ctx.lineWidth=alpha*3;ctx.stroke();
+  }
+}
+
+// ── HAND SKELETON DRAW ON MAIN CANVAS ────────────────────────────────────────
+const CONNECTIONS=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+  [0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],
+  [0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+
+function drawHandSkeleton(lm,color,W,H){
+  if(!lm)return;
+  CONNECTIONS.forEach(([a,b])=>{
+    const pa=lm[a],pb=lm[b];
+    ctx.beginPath();
+    ctx.moveTo((1-pa.x)*W,pa.y*H);
+    ctx.lineTo((1-pb.x)*W,pb.y*H);
+    ctx.strokeStyle=color+'55';ctx.lineWidth=1.5;ctx.stroke();
+  });
+  lm.forEach((pt,i)=>{
+    const x=(1-pt.x)*W,y=pt.y*H;
+    ctx.beginPath();ctx.arc(x,y,i===8?5:i===4?4:2.5,0,Math.PI*2);
+    ctx.fillStyle=i===8?'#00ff88':i===4?'#ffd166':color+'cc';
+    ctx.fill();
+  });
+}
+
+// Count extended fingers (rough)
+function countFingers(lm){
+  const tips=[4,8,12,16,20],bases=[2,5,9,13,17];
+  let count=0;
+  // Thumb: check x distance
+  if(Math.abs(lm[4].x-lm[2].x)>0.06)count++;
+  // Other 4 fingers: tip y < base y (extended upward in mirrored view)
+  for(let i=1;i<5;i++){
+    if(lm[tips[i]].y<lm[bases[i]].y-0.04)count++;
+  }
+  return count;
+}
+
+// ── LIVE PRICE FETCH ──────────────────────────────────────────────────────────
+let lastFetch=0;
+async function fetchLivePrices(){
+  try{
+    const res=await fetch(`${API}/api/prices`);
+    const data=await res.json();
+    const prices=data.prices||data;
+    let updated=0;
+    N.forEach(n=>{
+      // Map node id to price key (handle BTC/USD etc)
+      const pdata=prices[n.id]||prices[n.id.replace('/USD','')]||prices[n.id.split('/')[0]];
+      if(pdata){
+        n.ch=pdata.change_pct_raw!=null?pdata.change_pct_raw:(parseFloat(pdata.change_pct)||0);
+        updated++;
+      }
+    });
+    document.getElementById('assetCount').textContent=`LIVE CORRELATION — ${updated} ASSETS UPDATED`;
+    document.getElementById('liveTag').textContent='● LIVE';
+    document.getElementById('liveTag').style.color='#00ff41';
+  }catch(e){
+    document.getElementById('liveTag').textContent='◌ OFFLINE';
+    document.getElementById('liveTag').style.color='#ff4466';
+  }
+}
+
+// Fetch stored signals and overlay on nodes
+async function fetchStoredSignals(){
+  try{
+    const res=await fetch(`${API}/api/stored-predictions?limit=200`);
+    const data=await res.json();
+    const preds=data.predictions||[];
+    const today=new Date().toISOString().split('T')[0];
+    preds.forEach(p=>{
+      if(p.date!==today)return;
+      const n=N.find(x=>x.id===p.label||x.id===p.label.replace('USD','USD'));
+      if(n){
+        n.sig=p.signal==='BUY'?'BUY':p.signal==='SELL'?'SELL':'HOLD';
+        n.conf=p.confidence;
+      }
+    });
+  }catch(e){}
+}
+
+// Poll every 30 seconds
+async function pollLive(){
+  await fetchLivePrices();
+  await fetchStoredSignals();
+  lastFetch=Date.now();
+}
+pollLive();
+setInterval(pollLive,30000);
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let sel=null,drag=null,dox=0,doy=0;
+let mx=400,my=300;
+let hx=null,hy=null,lhx=null,lhy=null;
+let handLM0=null,handLM1=null; // full landmark arrays for skeleton
+let pinch=false,wasPinch=false;
+let lPinch=false,wasLPinch=false;
+let camOn=false,voiceOn=false,tick=0,hov=null;
+let gestureState='';
+let filterSignal=null; // 'BUY','SELL',null
+
+function gR(n){return Math.min(40,22+Math.abs(n.ch)*2.2);}
+function sc(s){
+  if(!s)return'#ffaa00';
+  return s.includes('STRONG')?'#00ff88':s==='BUY'?'#00ff41':s.includes('SELL')?'#ff4466':'#ffaa00';
+}
+function gN(x,y){
+  // Transform from screen to world coords considering zoom/pan
+  const wx=(x-panX)/zoom,wy=(y-panY)/zoom;
+  for(let i=N.length-1;i>=0;i--){
+    if(Math.hypot(wx-N[i].x,wy-N[i].y)<gR(N[i])+8)return N[i];
+  }
+  return null;
+}
+
+function showGesture(txt,dur=1200){
+  const el=document.getElementById('gestureHud');
+  el.textContent=txt;el.style.display='block';
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.style.display='none',dur);
+}
+
+function resetLayout(){
+  N.forEach(n=>{
+    const c=CP[n.cl];
+    n.x=(c.x+(Math.random()-0.5)*0.08)*gc.width;
+    n.y=(c.y+(Math.random()-0.5)*0.08)*gc.height;
+    n.vx=0;n.vy=0;
+  });
+  zoom=1;panX=0;panY=0;
+  showGesture('✋  LAYOUT RESET');
+}
+
+function info(n){
+  if(!n){document.getElementById('fNode').textContent='--';return;}
+  document.getElementById('fNode').textContent=n.name;
+  const se=document.getElementById('fSig');se.textContent=n.sig+(n.conf?` · ${n.conf.toFixed(0)}%`:'');se.style.color=sc(n.sig);
+  const ce=document.getElementById('fChg');ce.style.color=n.ch>=0?'#00ff41':'#ff4466';
+  ce.textContent=(n.ch>=0?'+':'')+n.ch.toFixed(2)+'%';
+  const cor=E.filter(([a,b])=>a===n.id||b===n.id).sort((x,y)=>y[2]-x[2]).slice(0,3)
+    .map(([a,b,w])=>(a===n.id?b:a)+' '+Math.round(w*100)+'%').join(' · ');
+  document.getElementById('fCor').textContent=cor||'--';
+}
+
+function tooltip(n,x,y){
+  const tt=document.getElementById('tt');
+  if(!n){tt.style.display='none';return;}
+  tt.style.display='block';
+  tt.style.left=Math.min(x+15,gc.width-160)+'px';
+  tt.style.top=Math.max(y-60,10)+'px';
+  tt.innerHTML=`<div style="color:${CC[n.cl]};font-weight:700;letter-spacing:2px;margin-bottom:4px;">${n.name}</div>
+    <div style="color:${sc(n.sig)};font-size:11px;">${n.sig}${n.conf?' · '+n.conf.toFixed(0)+'%':''}</div>
+    <div style="color:${n.ch>=0?'#00ff41':'#ff4466'};font-size:13px;font-weight:700;">${n.ch>=0?'+':''}${n.ch.toFixed(2)}%</div>
+    <div style="color:#3a6040;font-size:9px;margin-top:3px;">${n.cl.toUpperCase()} CLUSTER</div>`;
+}
+
+function physics(){
+  const W=gc.width,H=gc.height;
+  N.forEach(a=>{
+    N.forEach(b=>{
+      if(a===b)return;
+      const dx=a.x-b.x,dy=a.y-b.y,d=Math.max(1,Math.hypot(dx,dy));
+      const f=1200/(d*d);a.vx+=dx/d*f;a.vy+=dy/d*f;
+    });
+  });
+  E.forEach(([ai,bi,w])=>{
+    const a=N.find(n=>n.id===ai),b=N.find(n=>n.id===bi);
+    if(!a||!b)return;
+    const dx=b.x-a.x,dy=b.y-a.y,d=Math.max(1,Math.hypot(dx,dy));
+    const tgt=100+(1-w)*90,f=(d-tgt)*0.022;
+    const fx=dx/d*f,fy=dy/d*f;
+    a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;
+  });
+  N.forEach(n=>{
+    if(n===drag)return;
+    n.vx*=0.80;n.vy*=0.80;
+    n.x+=n.vx;n.y+=n.vy;
+    n.x=Math.max(40,Math.min(W-40,n.x));
+    n.y=Math.max(40,Math.min(H-40,n.y));
+  });
+}
+
+function draw(){
+  const W=gc.width,H=gc.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  tick++;
+
+  // Update zoom tag
+  document.getElementById('zoomTag').textContent=`ZOOM: ${Math.round(zoom*100)}%`;
+
+  // Active cursor in world coords
+  const cx=hx!==null?hx:mx,cy=hy!==null?hy:my;
+  // Convert screen to world
+  const wcx=(cx-panX)/zoom,wcy=(cy-panY)/zoom;
+  hov=null;
+  for(let i=N.length-1;i>=0;i--){
+    if(Math.hypot(wcx-N[i].x,wcy-N[i].y)<gR(N[i])+8){hov=N[i];break;}
+  }
+
+  physics();
+  updateParticles();
+
+  // Apply zoom/pan transform
+  ctx.save();
+  ctx.translate(panX,panY);
+  ctx.scale(zoom,zoom);
+
+  // Cluster labels
+  Object.entries(CP).forEach(([cl,pos])=>{
+    ctx.fillStyle=CC[cl]+'55';ctx.font='10px monospace';ctx.textAlign='center';
+    ctx.fillText(cl.toUpperCase(),pos.x*W,pos.y*H-70);
+  });
+
+  // Edges
+  E.forEach(([ai,bi,w])=>{
+    const a=N.find(n=>n.id===ai),b=N.find(n=>n.id===bi);if(!a||!b)return;
+    // Dim non-filtered nodes
+    if(filterSignal&&a.sig!==filterSignal&&b.sig!==filterSignal)return;
+    const iS=sel&&(sel.id===ai||sel.id===bi);
+    const iH=hov&&(hov.id===ai||hov.id===bi);
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+    ctx.strokeStyle=iS?`rgba(0,255,65,${w*0.9})`:iH?`rgba(0,170,255,${w*0.7})`:`rgba(0,255,65,${w*0.22})`;
+    ctx.lineWidth=iS?w*3:iH?w*2:w*1.2;ctx.stroke();
+    if(iS||iH){
+      const lx=(a.x+b.x)/2,ly=(a.y+b.y)/2;
+      ctx.fillStyle='rgba(0,255,65,0.7)';ctx.font='9px monospace';ctx.textAlign='center';
+      ctx.fillText(Math.round(w*100)+'%',lx,ly-4);
+    }
+  });
+
+  // Nodes
+  N.forEach(n=>{
+    const r=gR(n),col=CC[n.cl],iS=sel&&sel.id===n.id,iH=hov&&hov.id===n.id,sigC=sc(n.sig);
+    // Signal filter dimming
+    const dimmed=filterSignal&&n.sig!==filterSignal;
+    if(dimmed){ctx.globalAlpha=0.15;}
+
+    // Pulse for BUY/STRONG BUY
+    if(n.sig==='BUY'||n.sig==='STRONG BUY'){
+      const p=0.4+0.6*Math.sin(tick*0.07+n.x*0.01);
+      ctx.beginPath();ctx.arc(n.x,n.y,r+10+p*6,0,Math.PI*2);
+      ctx.fillStyle=sigC+'18';ctx.fill();
+    }
+    // Pulse for SELL
+    if(n.sig==='SELL'){
+      const p=0.4+0.6*Math.sin(tick*0.09+n.y*0.01);
+      ctx.beginPath();ctx.arc(n.x,n.y,r+8+p*4,0,Math.PI*2);
+      ctx.fillStyle='#ff446618';ctx.fill();
+    }
+    // Hover/select glow ring
+    if(iS||iH){
+      ctx.beginPath();ctx.arc(n.x,n.y,r+14,0,Math.PI*2);
+      ctx.fillStyle=(iS?sigC:col)+'25';ctx.fill();
+    }
+    // Hand hover glow ring — expands and pulses
+    if(hov&&hov.id===n.id&&camOn){
+      const pulse=r+12+4*Math.sin(tick*0.18);
+      ctx.beginPath();ctx.arc(n.x,n.y,pulse,0,Math.PI*2);
+      ctx.strokeStyle='#00ff8866';ctx.lineWidth=2;ctx.stroke();
+    }
+    // Node body
+    ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);
+    ctx.fillStyle=iS?sigC+'33':iH?col+'22':'#030810';ctx.fill();
+    ctx.strokeStyle=iS?sigC:iH?col:col+'88';ctx.lineWidth=iS?2.5:iH?2:1.2;ctx.stroke();
+    // Change arc
+    const pct=Math.min(1,Math.abs(n.ch)/7);
+    ctx.beginPath();ctx.arc(n.x,n.y,r+5,-Math.PI/2,-Math.PI/2+pct*Math.PI*2);
+    ctx.strokeStyle=n.ch>=0?'#00ff41':'#ff4466';ctx.lineWidth=3;ctx.stroke();
+    // Labels
+    ctx.textAlign='center';
+    ctx.fillStyle=iS?sigC:iH?col:'#e0e8f0bb';
+    ctx.font=(iS?'bold ':'')+'10px monospace';
+    ctx.fillText(n.id,n.x,n.y+4);
+    ctx.fillStyle=n.ch>=0?'#00ff41aa':'#ff4466aa';
+    ctx.font='9px monospace';
+    ctx.fillText((n.ch>=0?'+':'')+n.ch.toFixed(1)+'%',n.x,n.y+r+15);
+    // Confidence badge
+    if(n.conf&&(iS||iH)){
+      ctx.fillStyle='rgba(0,0,0,0.7)';
+      ctx.fillRect(n.x-18,n.y-r-20,36,14);
+      ctx.fillStyle=sigC;ctx.font='8px monospace';ctx.textAlign='center';
+      ctx.fillText(n.conf.toFixed(0)+'% conf',n.x,n.y-r-9);
+    }
+
+    ctx.globalAlpha=1;
+  });
+
+  ctx.restore(); // end zoom/pan transform
+
+  // Draw particles (screen space)
+  drawParticles();
+
+  // Draw finger trail (screen space)
+  if(camOn)drawTrail();
+
+  // Draw hand skeleton on MAIN canvas (screen space)
+  if(camOn){
+    if(handLM0)drawHandSkeleton(handLM0,'#00ff41',W,H);
+    if(handLM1)drawHandSkeleton(handLM1,'#ff44aa',W,H);
+  }
+
+  // Hand cursors (screen space)
+  [[hx,hy,'#00ff41',pinch],[lhx,lhy,'#ff44aa',lPinch]].forEach(([x,y,c,isPinch])=>{
+    if(x===null||y===null)return;
+    // Outer ring
+    ctx.beginPath();ctx.arc(x,y,isPinch?8:18,0,Math.PI*2);
+    ctx.strokeStyle=isPinch?'#00ff88':c+'99';ctx.lineWidth=isPinch?2.5:1.5;ctx.stroke();
+    // Inner dot when pinching
+    if(isPinch){ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fillStyle='#00ff88';ctx.fill();}
+    // Crosshair lines
+    ctx.beginPath();
+    ctx.moveTo(x-22,y);ctx.lineTo(x+22,y);
+    ctx.moveTo(x,y-22);ctx.lineTo(x,y+22);
+    ctx.strokeStyle=c+'33';ctx.lineWidth=1;ctx.stroke();
+  });
+
+  requestAnimationFrame(draw);
+}
+
+// ── MOUSE ─────────────────────────────────────────────────────────────────────
+gc.addEventListener('mousemove',e=>{
+  const r=gc.getBoundingClientRect(),sx=gc.width/r.width,sy=gc.height/r.height;
+  mx=(e.clientX-r.left)*sx;my=(e.clientY-r.top)*sy;
+  if(drag){
+    const wx=(mx-panX)/zoom,wy=(my-panY)/zoom;
+    drag.x=wx+dox;drag.y=wy+doy;drag.vx=0;drag.vy=0;
+  }
+  const h=gN(mx,my);
+  gc.style.cursor=h?'grab':'crosshair';
+  tooltip(h,mx,my);
+  if(h)info(h);
+});
+gc.addEventListener('mousedown',e=>{
+  const r=gc.getBoundingClientRect(),sx=gc.width/r.width,sy=gc.height/r.height;
+  const x=(e.clientX-r.left)*sx,y=(e.clientY-r.top)*sy;
+  const n=gN(x,y);
+  if(n){
+    const wx=(x-panX)/zoom,wy=(y-panY)/zoom;
+    drag=n;dox=n.x-wx;doy=n.y-wy;sel=n;info(n);
+  } else{sel=null;}
+});
+gc.addEventListener('mouseup',()=>{drag=null;});
+
+// Mouse wheel zoom
+gc.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const factor=e.deltaY>0?0.9:1.1;
+  zoom=Math.max(0.3,Math.min(3,zoom*factor));
+},{passive:false});
+
+// ── HAND TRACKING ─────────────────────────────────────────────────────────────
+let handStream=null;
+document.getElementById('handBtn').addEventListener('click',async()=>{
+  if(camOn){
+    camOn=false;hx=null;hy=null;lhx=null;lhy=null;drag=null;pinch=false;lPinch=false;
+    handLM0=null;handLM1=null;trail.length=0;
+    if(handStream)handStream.getTracks().forEach(t=>t.stop());
+    document.getElementById('camBox').style.display='none';
+    document.getElementById('handBtn').textContent='☝ HAND TRACKING';
+    document.getElementById('handBtn').classList.remove('on');
+    document.getElementById('modeLabel').textContent='MOUSE MODE';
+    document.getElementById('fStatus').textContent='MOUSE MODE';
+    return;
+  }
+  try{
+    const vid=document.getElementById('vid');
+    const hc=document.getElementById('hc');
+    const hctx=hc.getContext('2d');
+    hc.width=160;hc.height=120;
+    handStream=await navigator.mediaDevices.getUserMedia({video:{width:320,height:240,facingMode:'user'}});
+    vid.srcObject=handStream;await vid.play();
+    document.getElementById('camBox').style.display='block';
+    camOn=true;
+    document.getElementById('handBtn').textContent='✕ STOP CAMERA';
+    document.getElementById('handBtn').classList.add('on');
+    document.getElementById('modeLabel').textContent='HAND MODE';
+    document.getElementById('fStatus').textContent='☝ POINT · 🤌 PINCH · ✋ PALM=RESET';
+
+    if(typeof Hands!=='undefined'){
+      const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+      hands.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:0.65,minTrackingConfidence:0.5});
+
+      hands.onResults(res=>{
+        hctx.clearRect(0,0,160,120);
+        hx=null;hy=null;lhx=null;lhy=null;
+        handLM0=null;handLM1=null;
+
+        if(!res.multiHandLandmarks||res.multiHandLandmarks.length===0){
+          lastTwoHandDist=null;return;
+        }
+
+        // ── TWO-HAND ZOOM ──────────────────────────────────────────────────
+        if(res.multiHandLandmarks.length===2){
+          const lm0=res.multiHandLandmarks[0],lm1=res.multiHandLandmarks[1];
+          const p0x=(1-lm0[8].x)*gc.width,p0y=lm0[8].y*gc.height;
+          const p1x=(1-lm1[8].x)*gc.width,p1y=lm1[8].y*gc.height;
+          const dist=Math.hypot(p0x-p1x,p0y-p1y);
+          if(lastTwoHandDist!==null){
+            const delta=dist-lastTwoHandDist;
+            if(Math.abs(delta)>2){
+              zoom=Math.max(0.3,Math.min(3,zoom*(1+delta*0.003)));
+            }
+          }
+          lastTwoHandDist=dist;
+        } else {
+          lastTwoHandDist=null;
+        }
+
+        res.multiHandLandmarks.forEach((lm,i)=>{
+          const idx=lm[8],thumb=lm[4];
+          const rx=(1-idx.x)*gc.width;
+          const ry=idx.y*gc.height;
+
+          if(i===0){
+            hx=hx===null?rx:hx*0.5+rx*0.5;
+            hy=hy===null?ry:hy*0.5+ry*0.5;
+            handLM0=lm;
+            addTrail(hx,hy);
+
+            // Pinch detection
+            const pd=Math.hypot((idx.x-thumb.x)*gc.width,(idx.y-thumb.y)*gc.height);
+            wasPinch=pinch;pinch=pd<55;
+
+            if(pinch&&!wasPinch){
+              const n=gN(hx,hy);
+              if(n){
+                const wx=(hx-panX)/zoom,wy=(hy-panY)/zoom;
+                drag=n;dox=n.x-wx;doy=n.y-wy;sel=n;info(n);
+                spawnBurst(hx,hy,sc(n.sig));
+              }
+            }
+            if(!pinch&&wasPinch&&drag){
+              spawnBurst(hx,hy,'#00ff88');
+              drag=null;
+            }
+            if(drag&&hx!==null){
+              const wx=(hx-panX)/zoom,wy=(hy-panY)/zoom;
+              drag.x=wx;drag.y=wy;drag.vx=0;drag.vy=0;
+            }
+
+            // ── GESTURE RECOGNITION (right hand) ──────────────────────────
+            const fingers=countFingers(lm);
+
+            // Open palm (5 fingers) = reset layout
+            if(fingers>=5&&gestureState!=='palm'){
+              gestureState='palm';
+              resetLayout();
+              spawnBurst(hx,hy,'#ffd166');
+            } else if(fingers<5){
+              gestureState='';
+            }
+
+            // Point up (index only, 1 finger) = highlight BUY
+            if(fingers===1&&lm[8].y<lm[6].y&&gestureState!=='point_up'){
+              gestureState='point_up';
+              filterSignal='BUY';
+              showGesture('👆 SHOWING BUY SIGNALS');
+            }
+            // Point down (index down) = highlight SELL
+            else if(fingers===1&&lm[8].y>lm[6].y+0.05&&gestureState!=='point_down'){
+              gestureState='point_down';
+              filterSignal='SELL';
+              showGesture('👇 SHOWING SELL SIGNALS');
+            }
+            // Victory / two fingers = clear filter
+            else if(fingers===2&&gestureState!=='victory'){
+              gestureState='victory';
+              filterSignal=null;
+              showGesture('✌️ SHOWING ALL SIGNALS');
+            }
+
+            // Hover info
+            if(hx!==null){
+              const hn=gN(hx,hy);
+              if(hn){
+                info(hn);
+                tooltip(hn,hx,hy);
+                document.getElementById('fStatus').textContent='HOVERING: '+hn.id;
+              } else {
+                tooltip(null,0,0);
+                if(!sel)document.getElementById('fStatus').textContent='☝ POINT · 🤌 PINCH · ✋ PALM=RESET';
+              }
+            }
+
+          } else {
+            lhx=lhx===null?rx:lhx*0.5+rx*0.5;
+            lhy=lhy===null?ry:lhy*0.5+ry*0.5;
+            handLM1=lm;
+
+            // Left hand pinch = pan
+            const pd2=Math.hypot((lm[8].x-lm[4].x)*gc.width,(lm[8].y-lm[4].y)*gc.height);
+            wasLPinch=lPinch;lPinch=pd2<55;
+            if(lPinch&&wasLPinch&&lhx!==null){
+              // drag to pan canvas
+            }
+          }
+
+          // Draw hand preview in camera box
+          [0,4,8,12,16,20].forEach(j=>{
+            hctx.beginPath();hctx.arc((1-lm[j].x)*160,lm[j].y*120,3,0,Math.PI*2);
+            hctx.fillStyle=j===8?'#00ff88':j===4?'#ffaa00':i===0?'#00ff4166':'#ff44aa66';
+            hctx.fill();
+          });
+
+          document.getElementById('camLabel').textContent=
+            pinch?'PINCHING — DRAG':
+            res.multiHandLandmarks.length===2?'TWO HANDS — PINCH SPREAD TO ZOOM':
+            'POINT · PINCH · ✋ PALM RESET';
+        });
+      });
+
+      const camera=new Camera(vid,{
+        onFrame:async()=>{if(camOn)await hands.send({image:vid});},
+        width:320,height:240
+      });
+      camera.start();
+    }
+  }catch(err){
+    document.getElementById('modeLabel').textContent='CAMERA DENIED';
+    document.getElementById('modeLabel').style.color='#ff4466';
+  }
+});
+
+// ── VOICE CONTROL ─────────────────────────────────────────────────────────────
+let rec=null;
+document.getElementById('voiceBtn').addEventListener('click',()=>{
+  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
+    document.getElementById('fStatus').textContent='VOICE: CHROME ONLY';return;
+  }
+  if(voiceOn){
+    voiceOn=false;
+    if(rec)try{rec.stop();}catch(e){}
+    document.getElementById('voiceBtn').textContent='🎤 VOICE CONTROL';
+    document.getElementById('voiceBtn').classList.remove('on');
+    document.getElementById('fStatus').textContent='VOICE OFF';
+    return;
+  }
+  voiceOn=true;
+  document.getElementById('voiceBtn').textContent='🎤 LISTENING...';
+  document.getElementById('voiceBtn').classList.add('on');
+
+  // Full 128-asset voice map
+  const VOICE_MAP={
+    // US
+    'SPX':   ['S&P','SNP','S AND P','SP500','SPX','ES'],
+    'NASDAQ':['NASDAQ','NASDAK','QQQ'],
+    'DOW':   ['DOW','DOW JONES','DJI'],
+    'NVIDIA':['NVIDIA','NVIDA','INVIDIA','NVDA'],
+    'META':  ['META','FACEBOOK','FB'],
+    'AAPL':  ['APPLE','AAPL'],
+    'MSFT':  ['MICROSOFT','MSFT'],
+    'TSLA':  ['TESLA','TSLA'],
+    'AMZN':  ['AMAZON','AMZN'],
+    'GOOGL': ['GOOGLE','GOOGL','ALPHABET'],
+    'JPM':   ['JPMORGAN','JP MORGAN','JPM'],
+    'GS':    ['GOLDMAN','GOLDMAN SACHS','GS'],
+    'XOM':   ['EXXON','EXXONMOBIL','XOM'],
+    'WMT':   ['WALMART','WMT'],
+    'JNJ':   ['JOHNSON','JNJ'],
+    'PFE':   ['PFIZER','PFE'],
+    'NFLX':  ['NETFLIX','NFLX'],
+    // India
+    'NIFTY50':['NIFTY','NIFTY 50','NIFTI'],
+    'SENSEX': ['SENSEX','BSE'],
+    'TCS':    ['TCS','TATA','TATA CONSULTANCY'],
+    'INFY':   ['INFOSYS','INFY'],
+    'RELIANCE':['RELIANCE'],
+    'HDFC':   ['HDFC','HDFC BANK'],
+    'ICICI':  ['ICICI','ICICI BANK'],
+    'WIPRO':  ['WIPRO'],
+    'AIRTEL': ['AIRTEL','BHARTI'],
+    'SBIN':   ['SBI','STATE BANK','SBIN'],
+    'MARUTI': ['MARUTI','SUZUKI'],
+    'TATAMOTORS':['TATA MOTORS','TATAMOTORS'],
+    'AXISBANK':['AXIS','AXIS BANK'],
+    'BAJFINANCE':['BAJAJ FINANCE','BAJFINANCE'],
+    'ADANIENT':['ADANI','ADANI ENT'],
+    'ONGC':   ['ONGC','OIL GAS'],
+    'NTPC':   ['NTPC'],
+    'POWERGRID':['POWER GRID','POWERGRID'],
+    'ASIANPAINT':['ASIAN PAINTS','ASIANPAINT'],
+    'HUL':    ['HUL','UNILEVER','HINDUSTAN UNILEVER'],
+    'LTIM':   ['LTIM','LTI','LTI MINDTREE'],
+    'ZOMATO': ['ZOMATO'],
+    'TITAN':  ['TITAN'],
+    'SUNPHARMA':['SUN PHARMA','SUNPHARMA'],
+    // Crypto
+    'BTC/USD':['BITCOIN','BTC','BIT COIN'],
+    'ETH/USD':['ETHEREUM','ETHER','ETH'],
+    'SOL/USD':['SOLANA','SOL'],
+    'BNB/USD':['BNB','BINANCE COIN'],
+    'XRP/USD':['XRP','RIPPLE'],
+    'ADA/USD':['CARDANO','ADA'],
+    'AVAX/USD':['AVALANCHE','AVAX'],
+    'DOT/USD':['POLKADOT','DOT'],
+    'MATIC/USD':['POLYGON','MATIC'],
+    'LINK/USD':['CHAINLINK','LINK'],
+    // Metals
+    'GOLD':   ['GOLD','GOLDEN'],
+    'SILVER': ['SILVER'],
+    'COPPER': ['COPPER'],
+    'WTI':    ['OIL','WTI','CRUDE','CRUDE OIL'],
+    'BRENT':  ['BRENT','BRENT CRUDE'],
+    'NATGAS': ['NATURAL GAS','NATGAS','GAS'],
+    'PLATINUM':['PLATINUM'],
+    // LATAM
+    'MELI':   ['MERCADO','MELI','MERCADOLIBRE'],
+    'SQM':    ['SQM','LITHIUM'],
+    'VALE':   ['VALE'],
+    'IPSA':   ['IPSA','CHILE INDEX'],
+    'BOVESPA':['BOVESPA','BRAZIL','B3'],
+    'IPC':    ['IPC','MEXICO','BOLSA'],
+    'PBR':    ['PETROBRAS','PBR'],
+    'ITUB':   ['ITAU','ITUB'],
+    // Canada
+    'TSX':    ['TSX','TORONTO','CANADA'],
+    'RY':     ['ROYAL BANK','RBC','RY'],
+    'TD':     ['TD BANK','TD'],
+    'SHOP':   ['SHOPIFY','SHOP'],
+  };
+
+  function startRec(){
+    if(!voiceOn)return;
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    rec=new SR();
+    rec.continuous=false;rec.interimResults=false;rec.lang='en-US';
+    rec.onresult=e=>{
+      const word=e.results[0][0].transcript.trim().toUpperCase();
+      document.getElementById('fStatus').textContent='HEARD: "'+word+'"';
+
+      // Check for special commands
+      if(word.includes('RESET')||word.includes('CLEAR')){
+        resetLayout();
+        filterSignal=null;
+        document.getElementById('fStatus').style.color='#00ff88';
+        return;
+      }
+      if(word.includes('BUY')){filterSignal='BUY';showGesture('🎤 FILTER: BUY');return;}
+      if(word.includes('SELL')){filterSignal='SELL';showGesture('🎤 FILTER: SELL');return;}
+      if(word.includes('ALL')||word.includes('SHOW ALL')){filterSignal=null;showGesture('🎤 SHOWING ALL');return;}
+
+      let match=null;
+      for(const [id,keywords] of Object.entries(VOICE_MAP)){
+        if(keywords.some(k=>word.includes(k))){
+          // Find in N or just highlight by id
+          match=N.find(n=>n.id===id);
+          break;
+        }
+      }
+      if(match){
+        sel=match;info(match);
+        spawnBurst(match.x*zoom+panX,match.y*zoom+panY,sc(match.sig));
+        document.getElementById('fStatus').textContent='✅ '+match.name+' — '+match.sig;
+        document.getElementById('fStatus').style.color='#00ff88';
+      } else {
+        document.getElementById('fStatus').style.color='#ffaa00';
+        document.getElementById('fStatus').textContent='? NOT FOUND: "'+word+'"';
+      }
+    };
+    rec.onend=()=>{if(voiceOn)setTimeout(startRec,300);};
+    rec.onerror=(e)=>{if(voiceOn&&e.error!=='aborted')setTimeout(startRec,1000);};
+    try{rec.start();}catch(e){}
+  }
+  startRec();
+});
+
+draw();
+</script>
+</body>
+</html>
