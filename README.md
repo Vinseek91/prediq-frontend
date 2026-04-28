@@ -97,7 +97,7 @@ NEXT_PUBLIC_API_URL=https://your-railway-url.up.railway.app
 ## 🤖 How the AI Agent Works
 
 1. **Screen** — scans 60+ stocks for AI-generated predictions
-2. **Analyse** — swarm of 50 AI agents vote on direction and confidence
+2. **Analyse** — swarm of 2.4 million Miro Fish agents vote on direction and confidence
 3. **Validate** — enforces minimum 2:1 reward/risk ratio
 4. **Signal** — broadcasts BUY/SELL with entry, stop and target to Telegram
 5. **Post** — auto-generates signal card image and posts to LinkedIn
