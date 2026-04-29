@@ -402,110 +402,96 @@ function useStateInternal(init){
   return [s,ss];
 }
 
-function CandleSwarmChart({ swarm, asset }) {
-  const candleRef = useRef(null);
-  const swarmRef  = useRef(null);
-  const animRef   = useRef(0);
-  const [view, setView] = useStateInternal("both");
-  const [themeObj] = useTheme();
-  const candles = useRef([]);
-  if(candles.current.length===0 && asset.price>0){
-    const p=asset.price, vol=p*0.008; let prev=p*1.04;
-    for(let i=0;i<15;i++){
-      const o=prev, c=o+(Math.random()-0.52)*vol*2;
-      const h=Math.max(o,c)+Math.random()*vol, l=Math.min(o,c)-Math.random()*vol;
-      candles.current.push({o,h,l,c}); prev=c;
-    }
-    candles.current[14].c=p;
-  }
-  useEffect(()=>{
-    const cc=candleRef.current; if(!cc) return;
-    const ctx=cc.getContext("2d"); if(!ctx) return;
-    const W=cc.width, H=cc.height, cs=candles.current; if(!cs.length) return;
-    const allP=cs.flatMap(c=>[c.h,c.l]);
-    const minP=Math.min(...allP)-asset.price*0.003, maxP=Math.max(...allP)+asset.price*0.003;
-    const range=maxP-minP;
-    const toY=(p)=>H-18-((p-minP)/range)*(H-32);
-    const cw=34,gap=6,sx=12;
-    ctx.fillStyle="#050a0f"; ctx.fillRect(0,0,W,H);
-    for(let i=0;i<4;i++){
-      const y=16+(H-32)/3*i;
-      ctx.strokeStyle="#0d2035"; ctx.lineWidth=0.5;
-      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
-      const price=maxP-(range/3*i);
-      const sym=asset.currency==="₹"?"₹":asset.currency==="$"?"$":"CLP ";
-      ctx.fillStyle="#1a3a5c"; ctx.font="8px monospace";
-      ctx.fillText(sym+Math.round(price).toLocaleString(),3,y-2);
-    }
-    cs.forEach((c,i)=>{
-      const x=sx+i*(cw+gap), bull=c.c>=c.o, col=bull?themeObj.accentBuy:themeObj.accentSell;
-      const oy=toY(c.o),cy=toY(c.c),hy=toY(c.h),ly=toY(c.l);
-      if(i===14){
-        ctx.fillStyle=swarm&&swarm.sell_pct>50?"#ff446615":"#00ff8815";
-        ctx.fillRect(x-2,0,cw+4,H);
-        ctx.strokeStyle=swarm&&swarm.sell_pct>50?"#ff4466":"#00ff88";
-        ctx.lineWidth=1.5; ctx.setLineDash([3,3]);
-        ctx.beginPath(); ctx.moveTo(x+cw/2,0); ctx.lineTo(x+cw/2,H); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle=swarm&&swarm.sell_pct>50?"#ff4466":"#00ff88";
-        ctx.font="bold 8px monospace"; ctx.fillText("SIGNAL",x,10);
+function RealCandleChart({ asset, entry, target, stop, apiBase }: {
+  asset: string; entry: number; target: number; stop: number; apiBase: string;
+}) {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useStateInternal(true);
+  const [error, setError] = useStateInternal('');
+  const [days, setDays] = useStateInternal(60);
+  const [isLine, setIsLine] = useStateInternal(false);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    let chart: any;
+    setLoading(true);
+    setError('');
+
+    const loadChart = async () => {
+      try {
+        const { createChart, LineSeries, CandlestickSeries } = await import('lightweight-charts');
+        const res = await fetch(`${apiBase}/api/history/${asset}?days=${days}`);
+        const data = await res.json();
+
+        if (!data.candles || data.candles.length === 0) {
+          setError('No data available');
+          setLoading(false);
+          return;
+        }
+
+        setIsLine(!!data.is_line);
+
+        chart = createChart(chartRef.current!, {
+          width: chartRef.current!.clientWidth,
+          height: 260,
+          layout: { background: { color: '#0d1117' }, textColor: '#4a7a9b' },
+          grid: { vertLines: { color: '#0d2035' }, horzLines: { color: '#0d2035' } },
+          timeScale: { borderColor: '#0d2035' },
+          rightPriceScale: { borderColor: '#0d2035' },
+        });
+
+        if (data.is_line) {
+          const series = chart.addSeries(LineSeries, { color: '#00ff88', lineWidth: 2 });
+          series.setData(data.candles.map((c: any) => ({ time: c.time, value: c.close })));
+          if (entry) series.createPriceLine({ price: entry, color: '#00ff88', lineWidth: 1, lineStyle: 2, title: 'ENTRY' });
+          if (target) series.createPriceLine({ price: target, color: '#00aaff', lineWidth: 1, lineStyle: 2, title: 'TARGET' });
+          if (stop)   series.createPriceLine({ price: stop,   color: '#ff4444', lineWidth: 1, lineStyle: 2, title: 'STOP'   });
+        } else {
+          const series = chart.addSeries(CandlestickSeries, {
+            upColor: '#00ff88', downColor: '#ff4444',
+            borderUpColor: '#00ff88', borderDownColor: '#ff4444',
+            wickUpColor: '#00ff88', wickDownColor: '#ff4444',
+          });
+          series.setData(data.candles);
+          if (entry) series.createPriceLine({ price: entry, color: '#00ff88', lineWidth: 1, lineStyle: 2, title: 'ENTRY' });
+          if (target) series.createPriceLine({ price: target, color: '#00aaff', lineWidth: 1, lineStyle: 2, title: 'TARGET' });
+          if (stop)   series.createPriceLine({ price: stop,   color: '#ff4444', lineWidth: 1, lineStyle: 2, title: 'STOP'   });
+        }
+
+        chart.timeScale().fitContent();
+        setLoading(false);
+      } catch (e) {
+        setError('Chart load failed');
+        setLoading(false);
       }
-      ctx.strokeStyle=col; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(x+cw/2,hy); ctx.lineTo(x+cw/2,ly); ctx.stroke();
-      const top=Math.min(oy,cy), ht=Math.abs(cy-oy)||1.5;
-      ctx.fillStyle=bull?"#00ff8830":"#ff446630"; ctx.fillRect(x,top,cw,ht);
-      ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.strokeRect(x,top,cw,ht);
-    });
-    const times=["9:15","10:00","11:00","12:00","1:00","2:00","3:30"];
-    times.forEach((t,i)=>{
-      ctx.fillStyle="#1a3a5c"; ctx.font="8px monospace";
-      ctx.fillText(t,sx+Math.floor(i*14/6)*(cw+gap),H-3);
-    });
-  },[asset.price,swarm]);
-  useEffect(()=>{
-    const sc=swarmRef.current; if(!sc) return;
-    const sctx=sc.getContext("2d"); if(!sctx) return;
-    const W=sc.width,H=sc.height,N=180;
-    const buyPct=swarm?swarm.buy_pct/100:0.5, sellPct=swarm?swarm.sell_pct/100:0.2;
-    const agents=Array.from({length:N},()=>{
-      const r=Math.random();
-      const type=r<buyPct?"buy":r<buyPct+sellPct?"sell":"hold";
-      const bias=type==="buy"?0.4:type==="sell"?-0.4:0;
-      return{x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5+bias)*1.2,vy:(Math.random()-0.5)*1.2,type};
-    });
-    const draw=()=>{
-      sctx.clearRect(0,0,W,H);
-      agents.forEach(a=>{
-        a.vx+=(Math.random()-0.5)*0.08; a.vy+=(Math.random()-0.5)*0.08;
-        const spd=Math.hypot(a.vx,a.vy);
-        if(spd>1.5){a.vx=a.vx/spd*1.5;a.vy=a.vy/spd*1.5;}
-        a.x+=a.vx; a.y+=a.vy;
-        if(a.x<0)a.x=W;if(a.x>W)a.x=0;if(a.y<0)a.y=H;if(a.y>H)a.y=0;
-        const col=a.type==="buy"?themeObj.accentBuy:a.type==="sell"?themeObj.accentSell:"#ffaa00";
-        sctx.beginPath();sctx.arc(a.x,a.y,2,0,Math.PI*2);sctx.fillStyle=col;sctx.globalAlpha=0.75;sctx.fill();
-        sctx.beginPath();sctx.arc(a.x,a.y,4.5,0,Math.PI*2);sctx.fillStyle=col;sctx.globalAlpha=0.1;sctx.fill();
-      });
-      sctx.globalAlpha=1; animRef.current=requestAnimationFrame(draw);
     };
-    draw(); return()=>cancelAnimationFrame(animRef.current);
-  },[swarm]);
+
+    loadChart();
+    return () => { if (chart) chart.remove(); };
+  }, [asset, entry, target, stop, days]);
+
   return (
-    <div>
-      <div style={{display:"flex",gap:6,marginBottom:6}}>
-        {["CHART","SWARM","BOTH"].map(v=>(
-          <button key={v} onClick={()=>setView(v.toLowerCase())}
-            style={{padding:"3px 10px",borderRadius:3,fontSize:9,fontWeight:700,letterSpacing:1,cursor:"pointer",fontFamily:"inherit",
-              background:view===v.toLowerCase()?themeObj.accent:"transparent",
-              border:view===v.toLowerCase()?`1px solid ${themeObj.accent}`:`1px solid ${themeObj.border}`,
-              color:view===v.toLowerCase()?themeObj.bg:themeObj.muted}}>{v}</button>
-        ))}
+    <div style={{ width: '100%', background: '#0d1117', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px' }}>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[14, 30, 60].map(d => (
+            <button key={d} onClick={() => setDays(d)}
+              style={{ padding: '2px 7px', borderRadius: 3, fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                cursor: 'pointer', fontFamily: 'inherit',
+                background: days === d ? '#00ff88' : 'transparent',
+                border: days === d ? '1px solid #00ff88' : '1px solid #1a3a5c',
+                color: days === d ? '#050a0f' : '#4a7a9b' }}>
+              {d}D
+            </button>
+          ))}
+        </div>
+        <span style={{ fontSize: 8, color: '#1a3a5c', letterSpacing: 1 }}>
+          {isLine ? 'CLOSING PRICES' : 'LIVE PRICES'}
+        </span>
       </div>
-      <div style={{position:"relative",borderRadius:8,overflow:"hidden",background:"#050a0f",border:`1px solid ${themeObj.border}`}}>
-        {(view==="chart"||view==="both")&&<canvas ref={candleRef} width={640} height={160} style={{width:"100%",height:160,display:"block"}}/>}
-        {(view==="swarm"||view==="both")&&<canvas ref={swarmRef} width={640} height={view==="both"?160:120}
-          style={{width:"100%",height:view==="both"?160:120,display:"block",
-            position:view==="both"?"absolute":"relative",top:view==="both"?0:"auto",left:0,opacity:view==="both"?0.55:1}}/>}
-      </div>
+      {loading && <div style={{ padding: 16, color: '#00ff88', fontSize: 10, textAlign: 'center', letterSpacing: 2 }}>LOADING CHART...</div>}
+      {error   && <div style={{ padding: 16, color: '#ff4444', fontSize: 10, textAlign: 'center' }}>{error}</div>}
+      <div ref={chartRef} style={{ width: '100%' }} />
     </div>
   );
 }
@@ -585,6 +571,7 @@ export default function PrediqDashboard() {
   const [error,        setError]        = useState("");
   const [time,         setTime]         = useState("");
   const [activeTab,    setActiveTab]    = useState("signal");
+  const [chartTab,     setChartTab]     = useState<"SWARM"|"CHART">("SWARM");
   const [watchlist,    setWatchlist]    = useState<string[]>([]);
   const [searchQ,      setSearchQ]      = useState("");
   const [searchRes,    setSearchRes]    = useState<any[]>([]);
@@ -620,6 +607,14 @@ export default function PrediqDashboard() {
   // sessions that predate the timestamp feature.
   // Only redirects if NO code at all, or session explicitly expired (24h).
   useEffect(() => {
+    const CURRENT_VERSION = "v2";
+    const sessionVersion = localStorage.getItem("prediq_session_version");
+    if (sessionVersion !== CURRENT_VERSION) {
+      localStorage.clear();
+      setTimeout(() => { window.location.href = "/"; }, 500);
+      return;
+    }
+
     const SESSION_MS = 24 * 60 * 60 * 1000; // 24 hours
     const code = localStorage.getItem("prediq_access_code") || localStorage.getItem("prediq_code");
 
@@ -1275,6 +1270,19 @@ ABOUT PREDIQ:
 - Tracks 100+ assets: India, Chile, US, Crypto, Commodities, Forex
 - BUY / HOLD / SELL signals with entry price, target, stop-loss
 
+CHILEAN STOCK ALIASES:
+- "Aguas Andinas" or "water company Chile" or "AGUAS" → tracked as AGUAS (current price in LIVE PRICES)
+- "Falabella" → FALABELLA
+- "Cencosud" → CENCOSUD
+- "Copec" → COPEC
+- "LATAM Airlines" or "LAN" → LATAM
+- "Banco BCI" or "BCI" → BCI
+- "Banco de Chile" or "Bank of Chile" → BCHILE
+- "Entel" → ENTEL
+- "Colbun" → COLBUN
+- "CMPC" or "Empresas CMPC" → CMPC
+When user asks about any Chilean company by full name, map it to the ticker above and look it up in LIVE PRICES.
+
 INSTRUCTIONS:
 - When asked about India stocks (NIFTY, RELIANCE, etc.) look them up in LIVE PRICES above and cite the exact price and % change.
 - When asked about any asset, always state its current price and change from the data above.
@@ -1741,9 +1749,9 @@ INSTRUCTIONS:
             }}
             title="Logout"
             style={{
-              background:"none", border:"1px solid #1a3a2a", borderRadius:4,
+              background:"none", border:"1px solid rgba(255,68,68,0.4)", borderRadius:4,
               padding:isMobile?"6px 10px":"3px 8px", cursor:"pointer",
-              color:"#2a5a3a", fontSize:isMobile?11:9, fontFamily:"inherit",
+              color:"#ff4444", fontSize:isMobile?11:9, fontFamily:"inherit",
               letterSpacing:1, fontWeight:700,
             }}
           >LOGOUT</button>
@@ -2414,7 +2422,7 @@ INSTRUCTIONS:
         {timeframe==="day" && loading && (
           <div style={{...S.card,padding:32,textAlign:"center",marginBottom:12}}>
             <div style={{color:themeObj.accent,fontSize:11,letterSpacing:2,marginBottom:6}}>RUNNING SWARM</div>
-            <div style={{color:themeObj.muted,fontSize:10}}>50,000 Miro Fish agents analysing {selected.label} at live price {formatPrice(selected)}...</div>
+            <div style={{color:themeObj.muted,fontSize:10}}>2,400,000 Miro Fish agents analysing {selected.label} at live price {formatPrice(selected)}...</div>
           </div>
         )}
 
@@ -2424,7 +2432,7 @@ INSTRUCTIONS:
         {timeframe==="day" && !signal && !loading && (
           <div style={{...S.card,padding:32,textAlign:"center",marginBottom:12}}>
             <div style={{fontSize:11,color:themeObj.muted,letterSpacing:2,marginBottom:6}}>SELECT AN ASSET TO RUN SWARM ANALYSIS</div>
-            <div style={{fontSize:10,color:"#1a3a5c",marginBottom:16}}>50,000 Miro Fish agents will simulate investor behaviour using live market prices</div>
+            <div style={{fontSize:10,color:"#1a3a5c",marginBottom:16}}>2,400,000 Miro Fish agents will simulate investor behaviour using live market prices</div>
             {!pricesLoaded && (
               <div style={{fontSize:10,color:"#ffaa00"}}>Fetching live prices... please wait</div>
             )}
@@ -2537,11 +2545,30 @@ INSTRUCTIONS:
                   ))}
                 </div>
                 <div style={{marginBottom:12}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                     <span style={{fontSize:9,color:themeObj.muted,letterSpacing:2}}>MIRO FISH SWARM — LIVE</span>
-                    <span style={{fontSize:9,color:"#1a3a5c"}}>50,000 AGENTS</span>
+                    <div style={{display:"flex",gap:4}}>
+                      {(["SWARM","CHART"] as const).map(tab => (
+                        <button key={tab} onClick={() => setChartTab(tab)}
+                          style={{padding:"2px 8px",borderRadius:3,fontSize:9,fontWeight:700,letterSpacing:1,cursor:"pointer",fontFamily:"inherit",
+                            background:chartTab===tab?themeObj.accent:"transparent",
+                            border:chartTab===tab?`1px solid ${themeObj.accent}`:`1px solid ${themeObj.border}`,
+                            color:chartTab===tab?themeObj.bg:themeObj.muted}}>{tab}</button>
+                      ))}
+                    </div>
+                    <span style={{fontSize:9,color:"#1a3a5c"}}>2,400,000 AGENTS</span>
                   </div>
-                  <CandleSwarmChart swarm={signal.swarm} asset={signal.asset}/>
+                  {chartTab === "SWARM" ? (
+                    <FishCanvas swarm={signal.swarm} />
+                  ) : (
+                    <RealCandleChart
+                      asset={signal.asset.label}
+                      entry={signal.entry_price || 0}
+                      target={signal.target || 0}
+                      stop={signal.stop || 0}
+                      apiBase={API_BASE}
+                    />
+                  )}
                   <div style={{marginTop:8,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
                     {[["BUYING",signal.swarm.buy_pct,"#00ff88"],["HOLDING",signal.swarm.hold_pct,"#ffaa00"],["SELLING",signal.swarm.sell_pct,"#ff4466"]].map(([l,p,c])=>(
                       <div key={l as string}>
