@@ -293,12 +293,39 @@ const SECTOR_STRUCTURE: Record<string, { label: string; assets: AssetDef[] }> = 
   brazil: {
     label: "🇧🇷 BRAZIL",
     assets: [
-      { label: "PBR",   name: "Petrobras",      type: "stock", currency: "$"   },
-      { label: "VALE",  name: "Vale SA",         type: "stock", currency: "$"   },
-      { label: "ITUB",  name: "Itaú Unibanco",  type: "stock", currency: "$"   },
-      { label: "BBD",   name: "Banco Bradesco",  type: "stock", currency: "$"   },
-      { label: "ABEV",  name: "Ambev",           type: "stock", currency: "$"   },
-      { label: "WEGE3", name: "WEG Industries",  type: "stock", currency: "BRL" },
+      { label: "IBOV",   name: "Ibovespa Index",       type: "index",  currency: "BRL" },
+      { label: "PETR4",  name: "Petrobras PN",          type: "stock",  currency: "BRL" },
+      { label: "PETR3",  name: "Petrobras ON",          type: "stock",  currency: "BRL" },
+      { label: "VALE3",  name: "Vale ON",               type: "stock",  currency: "BRL" },
+      { label: "ITUB4",  name: "Itaú Unibanco PN",     type: "stock",  currency: "BRL" },
+      { label: "BBDC4",  name: "Banco Bradesco PN",     type: "stock",  currency: "BRL" },
+      { label: "BBAS3",  name: "Banco do Brasil ON",    type: "stock",  currency: "BRL" },
+      { label: "BPAC11", name: "BTG Pactual Units",     type: "stock",  currency: "BRL" },
+      { label: "SANB11", name: "Santander Brasil Units",type: "stock",  currency: "BRL" },
+      { label: "MGLU3",  name: "Magazine Luiza ON",     type: "stock",  currency: "BRL" },
+      { label: "LREN3",  name: "Lojas Renner ON",       type: "stock",  currency: "BRL" },
+      { label: "ASAI3",  name: "Assaí Atacadista ON",   type: "stock",  currency: "BRL" },
+      { label: "TOTS3",  name: "TOTVS ON",              type: "stock",  currency: "BRL" },
+      { label: "STNE",   name: "StoneCo",               type: "stock",  currency: "$"   },
+      { label: "PAGS",   name: "PagSeguro",             type: "stock",  currency: "$"   },
+      { label: "ELET3",  name: "Eletrobras ON",         type: "stock",  currency: "BRL" },
+      { label: "ELET6",  name: "Eletrobras PNB",        type: "stock",  currency: "BRL" },
+      { label: "EGIE3",  name: "Engie Brasil ON",       type: "stock",  currency: "BRL" },
+      { label: "CPFE3",  name: "CPFL Energia ON",       type: "stock",  currency: "BRL" },
+      { label: "EMBR3",  name: "Embraer ON",            type: "stock",  currency: "BRL" },
+      { label: "CCRO3",  name: "CCR ON",                type: "stock",  currency: "BRL" },
+      { label: "RAIL3",  name: "Rumo ON",               type: "stock",  currency: "BRL" },
+      { label: "HAPV3",  name: "Hapvida ON",            type: "stock",  currency: "BRL" },
+      { label: "RDOR3",  name: "Rede D'Or ON",          type: "stock",  currency: "BRL" },
+      { label: "FLRY3",  name: "Fleury ON",             type: "stock",  currency: "BRL" },
+      { label: "SUZB3",  name: "Suzano ON",             type: "stock",  currency: "BRL" },
+      { label: "GGBR4",  name: "Gerdau PN",             type: "stock",  currency: "BRL" },
+      { label: "CSNA3",  name: "CSN ON",                type: "stock",  currency: "BRL" },
+      { label: "WEGE3",  name: "WEG Industries ON",     type: "stock",  currency: "BRL" },
+      { label: "PBR",    name: "Petrobras ADR",         type: "stock",  currency: "$"   },
+      { label: "VALE",   name: "Vale ADR",              type: "stock",  currency: "$"   },
+      { label: "ITUB",   name: "Itaú ADR",              type: "stock",  currency: "$"   },
+      { label: "ABEV",   name: "Ambev ADR",             type: "stock",  currency: "$"   },
     ],
   },
   argentina: {
@@ -329,7 +356,15 @@ const SECTOR_STRUCTURE: Record<string, { label: string; assets: AssetDef[] }> = 
 };
 
 interface AssetDef { label: string; name: string; type: string; currency: string; }
-interface Asset extends AssetDef { price: number; change: number; }
+interface Asset {
+  label: string;
+  name: string;
+  price: number;
+  change: number;
+  currency: string;
+  type: string;
+  source?: string;
+}
 interface PriceData { price: number; change: number; change_pct: number; currency: string; source: string; fetched_at?: string; }
 interface PersonaVerdict { view: string; strength: number; reason: string; }
 interface PersonaMap { [key: string]: PersonaVerdict; }
@@ -546,6 +581,7 @@ function buildSectors(prices: Record<string, PriceData>): Record<string, { label
           price:  live ? live.price      : 0,
           change: live ? live.change_pct : 0,
           currency: live?.currency ? (live.currency === "USD" ? "$" : live.currency === "GBP" ? "£" : live.currency === "EUR" ? "€" : live.currency) : a.currency,
+          source: live?.source || null,
         };
       }),
     };
@@ -554,6 +590,7 @@ function buildSectors(prices: Record<string, PriceData>): Record<string, { label
 }
 
 export default function PrediqDashboard() {
+  const router = useRouter();
   const [themeObj, toggleTheme] = useTheme();
   const [accuracy,     setAccuracy]     = useState<string>("83.3");
   const [weeklyData,   setWeeklyData]   = useState<any>(null);
@@ -597,6 +634,8 @@ export default function PrediqDashboard() {
   const [swingLoading,   setSwingLoading]   = useState(false);
   const [positionLoading,setPositionLoading]= useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
+  const [tfSignal,       setTfSignal]       = useState<any>(null);
+  const [tfLoading,      setTfLoading]      = useState(false);
   const [isElite,   setIsElite]   = useState<boolean>(false);
   const [isPro,     setIsPro]     = useState<boolean>(false);
   const [authReady, setAuthReady] = useState<boolean>(false);
@@ -607,7 +646,7 @@ export default function PrediqDashboard() {
   // sessions that predate the timestamp feature.
   // Only redirects if NO code at all, or session explicitly expired (24h).
   useEffect(() => {
-    const CURRENT_VERSION = "v2";
+    const CURRENT_VERSION = "v3";
     const sessionVersion = localStorage.getItem("prediq_session_version");
     if (sessionVersion !== CURRENT_VERSION) {
       localStorage.clear();
@@ -650,6 +689,8 @@ export default function PrediqDashboard() {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
   // Voice greeting — once per session
   const [voicePromptVisible, setVoicePromptVisible] = useState(false);
   const greetedRef = useRef(false);
@@ -657,18 +698,34 @@ export default function PrediqDashboard() {
   const speakGreeting = () => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const msg = new SpeechSynthesisUtterance(
-      "Welcome to PREDIQ. Your AI-powered market intelligence is ready. The swarm is active."
-    );
-    msg.rate = 0.9;
-    msg.pitch = 1.0;
-    msg.lang = "en-US";
+
+    const speak = (voices: SpeechSynthesisVoice[]) => {
+      const msg = new SpeechSynthesisUtterance(
+        "Welcome to Predict. Your AI powered market intelligence is ready. The swarm is active."
+      );
+      msg.rate = 0.85;
+      msg.pitch = 1.0;
+      msg.volume = 1.0;
+      msg.lang = "en-US";
+      const preferred = voices.find(v =>
+        v.lang.startsWith("en") && /google|samantha|alex|karen|daniel/i.test(v.name)
+      ) || voices.find(v => v.lang === "en-US")
+        || voices.find(v => v.lang.startsWith("en"));
+      if (preferred) msg.voice = preferred;
+      window.speechSynthesis.speak(msg);
+    };
+
+    // Android loads voices async — must wait for onvoiceschanged
     const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v =>
-      v.lang.startsWith("en") && /google|samantha|alex|karen|daniel/i.test(v.name)
-    ) || voices.find(v => v.lang.startsWith("en"));
-    if (preferred) msg.voice = preferred;
-    window.speechSynthesis.speak(msg);
+    if (voices && voices.length > 0) {
+      speak(voices);
+    } else {
+      window.speechSynthesis.onvoiceschanged = () => {
+        const v = window.speechSynthesis.getVoices();
+        window.speechSynthesis.onvoiceschanged = null;
+        speak(v);
+      };
+    }
   };
 
   // Show tap-to-hear prompt on mount (3 s), play on first interaction
@@ -697,10 +754,21 @@ export default function PrediqDashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
   const [refreshing,   setRefreshing]   = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
-  const pullStartY = useRef(0);
-  const pulling    = useRef(false);
+  const pullStartY     = useRef(0);
+  const pulling        = useRef(false);
+  const pullDistanceRef = useRef(0);
   const PULL_THRESHOLD = 64; // px needed to trigger refresh
 
   // Market overview bar sparkline data
@@ -770,13 +838,15 @@ export default function PrediqDashboard() {
     const onTouchMove = (e: TouchEvent) => {
       if (!pulling.current) return;
       const dist = Math.max(0, e.touches[0].clientY - pullStartY.current);
-      if (dist > 0) setPullDistance(Math.min(dist, PULL_THRESHOLD + 20));
+      pullDistanceRef.current = Math.min(dist, PULL_THRESHOLD + 20);
+      if (dist > 0) setPullDistance(pullDistanceRef.current);
     };
     const onTouchEnd = () => {
-      if (pulling.current && pullDistance >= PULL_THRESHOLD) {
+      if (pulling.current && pullDistanceRef.current >= PULL_THRESHOLD) {
         fetchPrices();
       }
       pulling.current = false;
+      pullDistanceRef.current = 0;
       setPullDistance(0);
     };
     document.addEventListener("touchstart", onTouchStart, { passive: true });
@@ -787,7 +857,7 @@ export default function PrediqDashboard() {
       document.removeEventListener("touchmove",  onTouchMove);
       document.removeEventListener("touchend",   onTouchEnd);
     };
-  }, [pullDistance]);
+  }, []); // ✅ empty deps — no stale closure
 
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
@@ -1506,22 +1576,9 @@ INSTRUCTIONS:
     try {
       const res = await fetch(`${API_BASE}/api/price-history?asset=${asset.label}&days=14`);
       const data = await res.json();
-      const prices: number[] = data.prices || [];
-      if (prices.length < 7) {
-        setSwingSignal({ swing_signal: "HOLD", swing_pct: 0, swing_trend: "insufficient data", prices });
-        setSwingLoading(false); return;
-      }
-      const last7 = prices.slice(-7);
-      const slope = linRegSlope(last7);
-      const pctPerDay = last7[0] !== 0 ? (slope / last7[0]) * 100 : 0;
-      const rawPct = pctPerDay * 5;
-      const cap = dailyCap(asset.type) * 2;
-      const swing_pct = Math.round(Math.max(-cap, Math.min(cap, rawPct)) * 100) / 100;
-      const swing_signal = pctPerDay > 0.15 ? "BUY" : pctPerDay < -0.15 ? "SELL" : "HOLD";
-      const swing_trend = pctPerDay > 0.15 ? "uptrend" : pctPerDay < -0.15 ? "downtrend" : "flat";
-      setSwingSignal({ swing_signal, swing_pct, swing_trend, prices, asset: asset.label });
+      setSwingSignal({ prices: data.prices || [] });
     } catch(e) {
-      setSwingSignal({ swing_signal: "HOLD", swing_pct: 0, swing_trend: "error", prices: [] });
+      setSwingSignal({ prices: [] });
     }
     setSwingLoading(false);
   };
@@ -1532,22 +1589,25 @@ INSTRUCTIONS:
       const res = await fetch(`${API_BASE}/api/price-history?asset=${asset.label}&days=90`);
       const data = await res.json();
       const prices: number[] = data.prices || [];
-      if (prices.length < 30) {
-        setPositionSignal({ position_signal: "HOLD", position_pct: 0, ma30: 0, current_price: prices[prices.length-1] || 0, prices });
-        setPositionLoading(false); return;
-      }
       const last30 = prices.slice(-30);
-      const ma30 = last30.reduce((s, v) => s + v, 0) / 30;
-      const current = prices[prices.length - 1];
-      const diffPct = ma30 !== 0 ? ((current - ma30) / ma30) * 100 : 0;
-      const cap = dailyCap(asset.type) * 3;
-      const position_pct = Math.round(Math.max(-cap, Math.min(cap, diffPct)) * 100) / 100;
-      const position_signal = diffPct > 2 ? "BUY" : diffPct < -2 ? "SELL" : "HOLD";
-      setPositionSignal({ position_signal, position_pct, ma30: Math.round(ma30 * 100) / 100, current_price: Math.round(current * 100) / 100, prices: last30, asset: asset.label });
+      const ma30 = last30.length > 0 ? last30.reduce((s, v) => s + v, 0) / last30.length : 0;
+      setPositionSignal({ prices: last30, ma30: Math.round(ma30 * 100) / 100 });
     } catch(e) {
-      setPositionSignal({ position_signal: "HOLD", position_pct: 0, ma30: 0, current_price: 0, prices: [] });
+      setPositionSignal({ prices: [], ma30: 0 });
     }
     setPositionLoading(false);
+  };
+
+  const fetchTfSignal = async (asset: Asset, tf: string) => {
+    setTfLoading(true); setTfSignal(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/signal-timeframe/${encodeURIComponent(asset.label)}?timeframe=${tf}`);
+      const data = await res.json();
+      setTfSignal(data);
+    } catch(e) {
+      setTfSignal(null);
+    }
+    setTfLoading(false);
   };
 
   const fetchOptionsSignal = async (asset: Asset, tf: string = "swing") => {
@@ -1568,6 +1628,7 @@ INSTRUCTIONS:
     fetchSwingSignal(asset);
     fetchPositionSignal(asset);
     fetchOptionsSignal(asset, "swing");
+    fetchTfSignal(asset, "day");
     setTimeframe("day");
     setMenuOpen(false);
     // Fetch fusion signal
@@ -1627,7 +1688,7 @@ INSTRUCTIONS:
       letterSpacing:1,fontFamily:"inherit",whiteSpace:"nowrap" as const,
       background:activeSector===key?`${themeObj.accent}18`:themeObj.panel,
       border:activeSector===key?`1px solid ${themeObj.accent}`:`1px solid ${themeObj.border}`,
-      color:activeSector===key?themeObj.accent:themeObj.muted,
+      color:activeSector===key?themeObj.accent:"#ffffff",
       touchAction:"manipulation",
     }}>{label}</button>
   );
@@ -1690,6 +1751,42 @@ INSTRUCTIONS:
           }}
         />
       ))}
+
+      {/* ── PWA INSTALL BANNER ── */}
+      {showInstallBanner && installPrompt && (
+        <div style={{
+          position:"fixed", bottom:80, left:16, right:16, zIndex:200,
+          background:"#002a18", border:"1px solid #00ff88", borderRadius:10,
+          padding:"12px 16px", display:"flex", alignItems:"center",
+          justifyContent:"space-between", gap:12,
+          boxShadow:"0 0 20px rgba(0,255,136,0.3)"
+        }}>
+          <div>
+            <div style={{fontSize:11, fontWeight:700, color:"#00ff88", letterSpacing:1}}>
+              📲 ADD PREDIQ TO HOME SCREEN
+            </div>
+            <div style={{fontSize:9, color:"#3a6080", marginTop:2}}>
+              Get instant access like a native app
+            </div>
+          </div>
+          <div style={{display:"flex", gap:8}}>
+            <button onClick={async () => {
+              installPrompt.prompt();
+              await installPrompt.userChoice;
+              setShowInstallBanner(false);
+              setInstallPrompt(null);
+            }} style={{
+              background:"#00ff88", border:"none", borderRadius:6,
+              padding:"8px 14px", fontSize:11, fontWeight:700,
+              color:"#030810", cursor:"pointer", letterSpacing:1
+            }}>INSTALL</button>
+            <button onClick={() => setShowInstallBanner(false)} style={{
+              background:"none", border:"1px solid #0d2035", borderRadius:6,
+              padding:"8px 10px", fontSize:11, color:"#3a6080", cursor:"pointer"
+            }}>✕</button>
+          </div>
+        </div>
+      )}
 
       {/* ── PULL-TO-REFRESH INDICATOR ── */}
       {isMobile && pullDistance > 0 && (
@@ -1755,7 +1852,7 @@ INSTRUCTIONS:
               letterSpacing:1, fontWeight:700,
             }}
           >LOGOUT</button>
-          <button
+          {!isMobile && <button
             onClick={() => {
               if (voiceMuted) {
                 setVoiceMuted(false);
@@ -1771,23 +1868,23 @@ INSTRUCTIONS:
             style={{
               background: voiceMuted ? "none" : "rgba(0,255,136,0.12)",
               border: voiceMuted ? "1px solid #0d2035" : "1px solid rgba(0,255,136,0.5)",
-              borderRadius: 6, padding: isMobile ? "6px 12px" : "4px 10px",
+              borderRadius: 6, padding: "4px 10px",
               cursor: "pointer", color: voiceMuted ? "#1a3a5c" : "#00ff88",
-              fontSize: isMobile ? 12 : 10, fontFamily: "inherit", lineHeight: 1,
+              fontSize: 10, fontFamily: "inherit", lineHeight: 1,
               fontWeight: 700, letterSpacing: 1,
               boxShadow: voiceMuted ? "none" : "0 0 8px rgba(0,255,136,0.3)",
               display: "flex", alignItems: "center", gap: 4,
             }}
           >
-            {voiceMuted ? "🔇" : "🔊"}{!isMobile && !voiceMuted && <span>PREDIQ</span>}
-          </button>
-          <button onClick={fetchPrices} style={{background:"none",border:`1px solid ${themeObj.border}`,borderRadius:4,padding:isMobile?"6px 10px":"3px 8px",cursor:"pointer",color:themeObj.muted,fontSize:isMobile?14:10,fontFamily:"inherit"}}>↻</button>
-          <button
+            {voiceMuted ? "🔇" : "🔊"}<span>PREDIQ</span>
+          </button>}
+          {!isMobile && <button onClick={fetchPrices} style={{background:"none",border:`1px solid ${themeObj.border}`,borderRadius:4,padding:"3px 8px",cursor:"pointer",color:themeObj.muted,fontSize:10,fontFamily:"inherit"}}>↻</button>}
+          {!isMobile && <button
             onClick={toggleTheme}
-            style={{background:themeObj.key==="wallst"?`${themeObj.accent}22`:"none",border:`1px solid ${themeObj.border}`,borderRadius:5,padding:isMobile?"6px 10px":"3px 10px",cursor:"pointer",color:themeObj.accent,fontSize:isMobile?11:10,fontFamily:"inherit",fontWeight:700,letterSpacing:0.5,transition:"all 0.2s"}}
+            style={{background:themeObj.key==="wallst"?`${themeObj.accent}22`:"none",border:`1px solid ${themeObj.border}`,borderRadius:5,padding:"3px 10px",cursor:"pointer",color:themeObj.accent,fontSize:10,fontFamily:"inherit",fontWeight:700,letterSpacing:0.5,transition:"all 0.2s"}}
           >
             {themeObj.emoji}
-          </button>
+          </button>}
           <button onClick={()=>setMenuOpen(!menuOpen)} style={{background:"none",border:`1px solid ${themeObj.border}`,borderRadius:4,padding:isMobile?"6px 10px":"4px 8px",cursor:"pointer",color:themeObj.muted,fontSize:isMobile?18:16,lineHeight:1}}>
             {menuOpen?"✕":"☰"}
           </button>
@@ -1926,19 +2023,26 @@ INSTRUCTIONS:
       {/* ── MOBILE MENU ── */}
       {menuOpen && (
         <div style={{background:themeObj.panel,borderBottom:`1px solid ${themeObj.border}`,padding:"12px 16px",position:"sticky",top:45,zIndex:99}}>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+            <a href="/network" onClick={()=>setMenuOpen(false)} style={{fontSize:11,color:"#aa66ff",textDecoration:"none",border:"1px solid #aa44ff33",padding:"8px 14px",borderRadius:4,fontWeight:700}}>🔗 NETWORK</a>
+            <a href="/chart" onClick={()=>setMenuOpen(false)} style={{fontSize:11,color:"#00ff88",textDecoration:"none",border:"1px solid rgba(0,255,136,0.2)",padding:"8px 14px",borderRadius:4,fontWeight:700}}>📈 CHARTS</a>
+            <a href="/ai" onClick={()=>setMenuOpen(false)} style={{fontSize:11,color:"#aa66ff",textDecoration:"none",border:"1px solid rgba(170,102,255,0.3)",padding:"8px 14px",borderRadius:4,fontWeight:700}}>🤖 AI ANALYST</a>
+            <a href="/screener" onClick={()=>setMenuOpen(false)} style={{fontSize:11,color:"#ffd166",textDecoration:"none",border:"1px solid rgba(255,209,102,0.25)",padding:"8px 14px",borderRadius:4,fontWeight:700}}>🔍 SCREENER</a>
+            <a href="/mission" onClick={()=>setMenuOpen(false)} style={{fontSize:11,color:"#00d4ff",textDecoration:"none",border:"1px solid rgba(0,212,255,0.3)",padding:"8px 14px",borderRadius:4,fontWeight:700}}>🎯 MISSION</a>
+          </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
             <a href="/network" onClick={()=>setMenuOpen(false)} style={{fontSize:10,color:"#aa66ff",textDecoration:"none",border:"1px solid #aa66ff33",padding:"5px 12px",borderRadius:4}}>AGENT NETWORK</a>
             {Object.entries(sectors).map(([key,sec])=>(
-              <button key={key} onClick={()=>{setActiveSector(key);if(sec.assets[0])selectAsset(sec.assets[0]);setMenuOpen(false);}} style={{fontSize:10,fontWeight:700,cursor:"pointer",letterSpacing:1,fontFamily:"inherit",background:activeSector===key?`${themeObj.accent}18`:"transparent",border:activeSector===key?`1px solid ${themeObj.accent}`:`1px solid ${themeObj.border}`,color:activeSector===key?themeObj.accent:themeObj.muted,padding:"5px 12px",borderRadius:4}}>
+              <button key={key} onClick={()=>{setActiveSector(key);if(sec.assets[0])selectAsset(sec.assets[0]);setMenuOpen(false);}} style={{fontSize:10,fontWeight:700,cursor:"pointer",letterSpacing:1,fontFamily:"inherit",background:activeSector===key?`${themeObj.accent}18`:"transparent",border:activeSector===key?`1px solid ${themeObj.accent}`:`1px solid ${themeObj.border}`,color:activeSector===key?themeObj.accent:"#ffffff",padding:"5px 12px",borderRadius:4}}>
                 {sec.label}
               </button>
             ))}
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {(sectors[activeSector]?.assets||[]).map(a=>(
-              <button key={a.label} onClick={()=>selectAsset(a)} style={{padding:"6px 10px",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",background:selected.label===a.label?"#002a18":"#030810",border:selected.label===a.label?`1px solid ${themeObj.accent}`:`1px solid ${themeObj.border}`,color:selected.label===a.label?themeObj.accent:themeObj.muted}}>
+              <button key={a.label} onClick={()=>{ if(a.source!=="coming_soon") router.push(`/signal/${a.label}`); }} style={{padding:"6px 10px",borderRadius:4,fontSize:11,fontWeight:700,cursor:a.source==="coming_soon"?"default":"pointer",fontFamily:"inherit",background:selected.label===a.label?"#002a18":"#030810",border:selected.label===a.label?`1px solid ${themeObj.accent}`:`1px solid ${themeObj.border}`,color:selected.label===a.label?themeObj.accent:"#ffffff",opacity:a.source==="coming_soon"?0.5:1}}>
                 {a.label}
-                <span style={{display:"block",fontSize:9,color:a.change>=0?themeObj.accentBuy:themeObj.accentSell}}>{a.price>0?(a.change>=0?"+":"")+a.change.toFixed(2)+"%":"..."}</span>
+                <span style={{display:"block",fontSize:9,color:a.source==="coming_soon"?themeObj.muted:a.change>=0?themeObj.accentBuy:themeObj.accentSell}}>{a.source==="coming_soon"?"📡":(a.price>0?(a.change>=0?"+":"")+a.change.toFixed(2)+"%":"...")}</span>
               </button>
             ))}
           </div>
@@ -2033,14 +2137,14 @@ INSTRUCTIONS:
             alignItems:"center",
           }}>
             {(sectors[activeSector]?.assets||[]).map(a=>(
-              <button key={a.label} onClick={()=>selectAsset(a)} style={{
+              <button key={a.label} onClick={()=>router.push(`/signal/${a.label}`)} style={{
                 padding:isMobile?"12px 8px":"7px 12px",
                 borderRadius:isMobile?6:4,
                 fontSize:isMobile?12:11,
                 fontWeight:700,cursor:"pointer",letterSpacing:1,fontFamily:"inherit",
                 background:selected.label===a.label?`${themeObj.accent}18`:themeObj.panel,
-                border:selected.label===a.label?"1px solid #00ff88":"1px solid #0d2035",
-                color:selected.label===a.label?"#00ff88":"#3a6080",
+                border:selected.label===a.label?`1px solid ${themeObj.accent}`:`1px solid ${themeObj.border}`,
+                color:selected.label===a.label?themeObj.accent:"#ffffff",
                 boxShadow:selected.label===a.label?"0 0 10px rgba(0,255,136,0.12)":"none",
                 textAlign:"center" as const,
                 touchAction:"manipulation",
@@ -2121,7 +2225,7 @@ INSTRUCTIONS:
                 <button key={label} onClick={()=>selectAsset(asset)} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",display:"flex",gap:6,alignItems:"center",flexShrink:0,padding:0}}>
                   <span style={{fontSize:11,color:"#ffaa00",fontWeight:700}}>{label}</span>
                   <span style={{fontSize:10,color:"#8ab0cc"}}>{formatPrice(asset)}</span>
-                  <span style={{fontSize:10,color:asset.change>=0?"#00ff88":"#ff4466"}}>{asset.change>=0?"+":""}{asset.change.toFixed(2)}%</span>
+                  <span style={{fontSize:10,color:asset.change>=0?themeObj.accentBuy:themeObj.accentSell}}>{asset.change>=0?"+":""}{asset.change.toFixed(2)}%</span>
                 </button>
               );
             })}
@@ -2134,8 +2238,10 @@ INSTRUCTIONS:
             {([["day","DAY TRADE","#00ff88"],["swing","SWING 3-7D","#00aaff"],["position","POSITION 30D","#aa66ff"],["options","OPTIONS","#ffaa00"]] as const).map(([tf,label,col])=>(
               <button key={tf} onClick={()=>{
                 setTimeframe(tf as any);
-                if(tf==="swing" && !swingSignal) fetchSwingSignal(selected);
-                if(tf==="position" && !positionSignal) fetchPositionSignal(selected);
+                setTfSignal(null);
+                if(tf==="day") fetchTfSignal(selected, "day");
+                if(tf==="swing") { fetchTfSignal(selected, "swing"); if(!swingSignal) fetchSwingSignal(selected); }
+                if(tf==="position") { fetchTfSignal(selected, "position"); if(!positionSignal) fetchPositionSignal(selected); }
                 if(tf==="options" && !optionsSignal) fetchOptionsSignal(selected, "swing");
               }} style={{
                 flex:1,padding:isMobile?"11px 4px":"7px 4px",border:"1px solid",fontFamily:"inherit",cursor:"pointer",borderRadius:5,
@@ -2156,55 +2262,58 @@ INSTRUCTIONS:
         {/* ── SWING SIGNAL PANEL ── */}
         {timeframe==="swing" && (
           <div style={{marginBottom:12}}>
-            {swingLoading && (
+            {(tfLoading || swingLoading) && (
               <div style={{background:"rgba(0,170,255,0.05)",border:"1px solid rgba(0,170,255,0.2)",borderRadius:8,padding:"24px",textAlign:"center"}}>
-                <div style={{color:"#00aaff",fontSize:11,letterSpacing:2}}>FETCHING 14-DAY HISTORY...</div>
+                <div style={{color:"#00aaff",fontSize:11,letterSpacing:2}}>COMPUTING SWING SIGNAL...</div>
               </div>
             )}
-            {swingSignal && !swingLoading && (()=>{
-              const sc = swingSignal.swing_signal==="BUY"?"#00ff88":swingSignal.swing_signal==="SELL"?"#ff4466":"#ffaa00";
+            {tfSignal && !tfLoading && (()=>{
+              const sc = tfSignal.signal==="BUY"||tfSignal.signal==="STRONG BUY"?"#00ff88":tfSignal.signal==="SELL"||tfSignal.signal==="STRONG SELL"?"#ff4466":"#ffaa00";
               return (
-                <div style={{background:"rgba(0,170,255,0.04)",border:"1px solid rgba(0,170,255,0.18)",borderRadius:8,padding:"20px"}}>
+                <div style={{background:"rgba(0,170,255,0.04)",border:`1px solid ${sc}30`,borderRadius:8,padding:"20px"}}>
                   <div style={{fontSize:9,color:"rgba(0,170,255,0.6)",letterSpacing:"0.18em",marginBottom:14}}>// SWING SIGNAL — 3 TO 7 DAYS</div>
-                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:isMobile?6:10,marginBottom:16}}>
-                    {[
-                      {label:"SWING SIGNAL",value:swingSignal.swing_signal,color:sc},
-                      {label:"PROJ. MOVE",  value:`${swingSignal.swing_pct>=0?"+":""}${swingSignal.swing_pct}%`,color:swingSignal.swing_pct>=0?"#00ff88":"#ff4466"},
-                      {label:"TREND",       value:swingSignal.swing_trend?.toUpperCase()||"FLAT",color:"#00aaff"},
-                    ].map(k=>(
-                      <div key={k.label} style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:6,padding:"12px 14px"}}>
-                        <div style={{fontSize:8,color:"rgba(255,255,255,0.3)",letterSpacing:"0.15em",marginBottom:6}}>{k.label}</div>
-                        <div style={{fontSize:20,fontWeight:700,color:k.color}}>{k.value}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,flexWrap:"wrap"}}>
+                    <div style={{display:"inline-flex",alignItems:"center",gap:7,background:sc+"18",border:`1px solid ${sc}`,borderRadius:4,padding:"7px 16px"}}>
+                      <div style={{width:7,height:7,borderRadius:"50%",background:sc,boxShadow:`0 0 7px ${sc}`}}/>
+                      <span style={{fontSize:14,fontWeight:700,color:sc,letterSpacing:2}}>{tfSignal.signal}</span>
+                    </div>
+                    <div>
+                      <div style={{fontSize:22,fontWeight:700,color:sc,lineHeight:1}}>{tfSignal.confidence}%</div>
+                      <div style={{fontSize:8,color:"rgba(255,255,255,0.3)",letterSpacing:"0.12em",marginTop:2}}>CONFIDENCE</div>
+                    </div>
+                    {tfSignal.rsi != null && (
+                      <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:5,padding:"8px 12px"}}>
+                        <div style={{fontSize:8,color:"rgba(255,255,255,0.3)",letterSpacing:"0.12em",marginBottom:3}}>RSI</div>
+                        <div style={{fontSize:16,fontWeight:700,color:"#00aaff"}}>{tfSignal.rsi?.toFixed(1)}</div>
                       </div>
-                    ))}
+                    )}
                   </div>
-                  {swingSignal.prices?.length > 1 && (() => {
+                  {tfSignal.rationale && (
+                    <div style={{background:`${sc}08`,border:`1px solid ${sc}20`,borderRadius:6,padding:"12px 14px",fontSize:10,color:"rgba(255,255,255,0.55)",lineHeight:1.7,marginBottom:14}}>
+                      {tfSignal.rationale}
+                    </div>
+                  )}
+                  {swingSignal?.prices?.length > 1 && (() => {
                     const pts: number[] = swingSignal.prices.slice(-14);
                     const mn = Math.min(...pts), mx = Math.max(...pts), rng = mx - mn || 1;
                     const W = 260, H = 48;
                     const points = pts.map((p: number, i: number) =>
                       `${(i/(pts.length-1))*W},${H - ((p-mn)/rng)*H}`).join(" ");
-                    const color = swingSignal.swing_signal==="BUY"?"#00ff88":swingSignal.swing_signal==="SELL"?"#ff4466":"#ffaa00";
                     return (
-                      <div style={{marginBottom:12,background:"rgba(0,0,0,0.3)",borderRadius:6,padding:"10px 14px"}}>
+                      <div style={{marginBottom:14,background:"rgba(0,0,0,0.3)",borderRadius:6,padding:"10px 14px"}}>
                         <div style={{fontSize:8,color:"rgba(255,255,255,0.3)",letterSpacing:"0.12em",marginBottom:6}}>14-DAY PRICE HISTORY</div>
                         <svg width={W} height={H} style={{display:"block"}}>
-                          <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" opacity="0.8"/>
-                          <circle cx={(pts.length-1)/(pts.length-1)*W} cy={H-((pts[pts.length-1]-mn)/rng)*H} r="3" fill={color}/>
+                          <polyline points={points} fill="none" stroke={sc} strokeWidth="1.5" opacity="0.8"/>
+                          <circle cx={W} cy={H-((pts[pts.length-1]-mn)/rng)*H} r="3" fill={sc}/>
                         </svg>
                       </div>
                     );
                   })()}
-                  <div style={{background:"rgba(0,170,255,0.06)",borderRadius:6,padding:"12px 14px",fontSize:10,color:"rgba(255,255,255,0.5)",lineHeight:1.6}}>
-                    <span style={{color:"#00aaff",fontWeight:700}}>HOW IT WORKS: </span>
-                    Linear regression slope over last 7 days of price history. Positive slope → SWING BUY.
-                    Magnitude capped at 2× daily limit ({dailyCap(selected.type)*2}% max for {selected.type}).
-                  </div>
-                  <button onClick={()=>fetchSwingSignal(selected)} style={{marginTop:12,padding:"8px 18px",background:"rgba(0,170,255,0.08)",border:"1px solid rgba(0,170,255,0.3)",color:"#00aaff",fontFamily:"inherit",fontSize:10,cursor:"pointer",borderRadius:4,letterSpacing:1}}>REFRESH</button>
+                  <button onClick={()=>{fetchTfSignal(selected,"swing");fetchSwingSignal(selected);}} style={{padding:"8px 18px",background:"rgba(0,170,255,0.08)",border:"1px solid rgba(0,170,255,0.3)",color:"#00aaff",fontFamily:"inherit",fontSize:10,cursor:"pointer",borderRadius:4,letterSpacing:1}}>REFRESH</button>
                 </div>
               );
             })()}
-            {!swingSignal && !swingLoading && (
+            {!tfSignal && !tfLoading && (
               <div style={{background:"rgba(0,170,255,0.04)",border:"1px solid rgba(0,170,255,0.15)",borderRadius:8,padding:"20px",textAlign:"center",fontSize:10,color:"rgba(0,170,255,0.5)"}}>
                 Select an asset to load swing analysis
               </div>
@@ -2215,57 +2324,60 @@ INSTRUCTIONS:
         {/* ── POSITION SIGNAL PANEL ── */}
         {timeframe==="position" && (
           <div style={{marginBottom:12}}>
-            {positionLoading && (
+            {(tfLoading || positionLoading) && (
               <div style={{background:"rgba(170,102,255,0.05)",border:"1px solid rgba(170,102,255,0.2)",borderRadius:8,padding:"24px",textAlign:"center"}}>
-                <div style={{color:"#aa66ff",fontSize:11,letterSpacing:2}}>FETCHING 90-DAY HISTORY...</div>
+                <div style={{color:"#aa66ff",fontSize:11,letterSpacing:2}}>COMPUTING POSITION SIGNAL...</div>
               </div>
             )}
-            {positionSignal && !positionLoading && (()=>{
-              const sc = positionSignal.position_signal==="BUY"?"#00ff88":positionSignal.position_signal==="SELL"?"#ff4466":"#ffaa00";
+            {tfSignal && !tfLoading && (()=>{
+              const sc = tfSignal.signal==="BUY"||tfSignal.signal==="STRONG BUY"?"#00ff88":tfSignal.signal==="SELL"||tfSignal.signal==="STRONG SELL"?"#ff4466":"#ffaa00";
               return (
-                <div style={{background:"rgba(170,102,255,0.04)",border:"1px solid rgba(170,102,255,0.18)",borderRadius:8,padding:"20px"}}>
+                <div style={{background:"rgba(170,102,255,0.04)",border:`1px solid ${sc}30`,borderRadius:8,padding:"20px"}}>
                   <div style={{fontSize:9,color:"rgba(170,102,255,0.7)",letterSpacing:"0.18em",marginBottom:14}}>// POSITION SIGNAL — 30 DAYS</div>
-                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:isMobile?6:10,marginBottom:16}}>
-                    {[
-                      {label:"POSITION SIGNAL",value:positionSignal.position_signal,color:sc},
-                      {label:"VS 30-DAY MA",   value:`${positionSignal.position_pct>=0?"+":""}${positionSignal.position_pct}%`,color:positionSignal.position_pct>=0?"#00ff88":"#ff4466"},
-                      {label:"30-DAY MA",       value:positionSignal.ma30>0?`${positionSignal.ma30.toFixed(2)}`:"—",color:"#aa66ff"},
-                    ].map(k=>(
-                      <div key={k.label} style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:6,padding:"12px 14px"}}>
-                        <div style={{fontSize:8,color:"rgba(255,255,255,0.3)",letterSpacing:"0.15em",marginBottom:6}}>{k.label}</div>
-                        <div style={{fontSize:20,fontWeight:700,color:k.color}}>{k.value}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,flexWrap:"wrap"}}>
+                    <div style={{display:"inline-flex",alignItems:"center",gap:7,background:sc+"18",border:`1px solid ${sc}`,borderRadius:4,padding:"7px 16px"}}>
+                      <div style={{width:7,height:7,borderRadius:"50%",background:sc,boxShadow:`0 0 7px ${sc}`}}/>
+                      <span style={{fontSize:14,fontWeight:700,color:sc,letterSpacing:2}}>{tfSignal.signal}</span>
+                    </div>
+                    <div>
+                      <div style={{fontSize:22,fontWeight:700,color:sc,lineHeight:1}}>{tfSignal.confidence}%</div>
+                      <div style={{fontSize:8,color:"rgba(255,255,255,0.3)",letterSpacing:"0.12em",marginTop:2}}>CONFIDENCE</div>
+                    </div>
+                    {tfSignal.rsi != null && (
+                      <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:5,padding:"8px 12px"}}>
+                        <div style={{fontSize:8,color:"rgba(255,255,255,0.3)",letterSpacing:"0.12em",marginBottom:3}}>RSI</div>
+                        <div style={{fontSize:16,fontWeight:700,color:"#aa66ff"}}>{tfSignal.rsi?.toFixed(1)}</div>
                       </div>
-                    ))}
+                    )}
                   </div>
-                  {positionSignal.prices?.length > 1 && (() => {
+                  {tfSignal.rationale && (
+                    <div style={{background:`${sc}08`,border:`1px solid ${sc}20`,borderRadius:6,padding:"12px 14px",fontSize:10,color:"rgba(255,255,255,0.55)",lineHeight:1.7,marginBottom:14}}>
+                      {tfSignal.rationale}
+                    </div>
+                  )}
+                  {positionSignal?.prices?.length > 1 && (() => {
                     const pts: number[] = positionSignal.prices;
                     const mn = Math.min(...pts), mx = Math.max(...pts), rng = mx - mn || 1;
                     const W = 260, H = 48;
                     const points = pts.map((p: number, i: number) =>
                       `${(i/(pts.length-1))*W},${H - ((p-mn)/rng)*H}`).join(" ");
-                    const maY = H - ((positionSignal.ma30 - mn) / rng) * H;
-                    const color = positionSignal.position_signal==="BUY"?"#00ff88":positionSignal.position_signal==="SELL"?"#ff4466":"#ffaa00";
+                    const maY = positionSignal.ma30 > 0 ? H - ((positionSignal.ma30 - mn) / rng) * H : -1;
                     return (
-                      <div style={{marginBottom:12,background:"rgba(0,0,0,0.3)",borderRadius:6,padding:"10px 14px"}}>
+                      <div style={{marginBottom:14,background:"rgba(0,0,0,0.3)",borderRadius:6,padding:"10px 14px"}}>
                         <div style={{fontSize:8,color:"rgba(255,255,255,0.3)",letterSpacing:"0.12em",marginBottom:6}}>30-DAY PRICE vs MA (purple line)</div>
                         <svg width={W} height={H} style={{display:"block"}}>
-                          <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" opacity="0.8"/>
-                          <line x1="0" y1={maY} x2={W} y2={maY} stroke="#aa66ff" strokeWidth="1" strokeDasharray="4,3" opacity="0.7"/>
-                          <circle cx={W} cy={H-((pts[pts.length-1]-mn)/rng)*H} r="3" fill={color}/>
+                          <polyline points={points} fill="none" stroke={sc} strokeWidth="1.5" opacity="0.8"/>
+                          {maY >= 0 && <line x1="0" y1={maY} x2={W} y2={maY} stroke="#aa66ff" strokeWidth="1" strokeDasharray="4,3" opacity="0.7"/>}
+                          <circle cx={W} cy={H-((pts[pts.length-1]-mn)/rng)*H} r="3" fill={sc}/>
                         </svg>
                       </div>
                     );
                   })()}
-                  <div style={{background:"rgba(170,102,255,0.06)",borderRadius:6,padding:"12px 14px",fontSize:10,color:"rgba(255,255,255,0.5)",lineHeight:1.6}}>
-                    <span style={{color:"#aa66ff",fontWeight:700}}>HOW IT WORKS: </span>
-                    Compares current price to 30-day moving average. If current &gt; MA by &gt;2% → POSITION BUY.
-                    If current &lt; MA by &gt;2% → POSITION SELL. Capped at 3× daily limit ({dailyCap(selected.type)*3}% for {selected.type}).
-                  </div>
-                  <button onClick={()=>fetchPositionSignal(selected)} style={{marginTop:12,padding:"8px 18px",background:"rgba(170,102,255,0.08)",border:"1px solid rgba(170,102,255,0.3)",color:"#aa66ff",fontFamily:"inherit",fontSize:10,cursor:"pointer",borderRadius:4,letterSpacing:1}}>REFRESH</button>
+                  <button onClick={()=>{fetchTfSignal(selected,"position");fetchPositionSignal(selected);}} style={{padding:"8px 18px",background:"rgba(170,102,255,0.08)",border:"1px solid rgba(170,102,255,0.3)",color:"#aa66ff",fontFamily:"inherit",fontSize:10,cursor:"pointer",borderRadius:4,letterSpacing:1}}>REFRESH</button>
                 </div>
               );
             })()}
-            {!positionSignal && !positionLoading && (
+            {!tfSignal && !tfLoading && (
               <div style={{background:"rgba(170,102,255,0.04)",border:"1px solid rgba(170,102,255,0.15)",borderRadius:8,padding:"20px",textAlign:"center",fontSize:10,color:"rgba(170,102,255,0.5)"}}>
                 Select an asset to load position analysis
               </div>
@@ -2412,6 +2524,43 @@ INSTRUCTIONS:
           </div>
         )}
 
+        {/* ── AI MOMENTUM SIGNAL — DAY TRADE ── */}
+        {timeframe==="day" && (
+          <div style={{marginBottom:10}}>
+            {tfLoading && (
+              <div style={{background:"rgba(0,255,136,0.04)",border:"1px solid rgba(0,255,136,0.15)",borderRadius:7,padding:"12px 16px",fontSize:10,color:"rgba(0,255,136,0.5)",letterSpacing:1}}>
+                COMPUTING AI MOMENTUM SIGNAL...
+              </div>
+            )}
+            {tfSignal && !tfLoading && (()=>{
+              const sc = tfSignal.signal==="BUY"||tfSignal.signal==="STRONG BUY"?"#00ff88":tfSignal.signal==="SELL"||tfSignal.signal==="STRONG SELL"?"#ff4466":"#ffaa00";
+              return (
+                <div style={{background:"rgba(0,255,136,0.04)",border:`1px solid ${sc}30`,borderRadius:7,padding:"14px 16px"}}>
+                  <div style={{fontSize:8,color:"rgba(0,255,136,0.5)",letterSpacing:"0.18em",marginBottom:10}}>// AI MOMENTUM SIGNAL — DAY TRADE</div>
+                  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,flexWrap:"wrap"}}>
+                    <div style={{display:"inline-flex",alignItems:"center",gap:6,background:sc+"18",border:`1px solid ${sc}`,borderRadius:4,padding:"5px 12px"}}>
+                      <div style={{width:6,height:6,borderRadius:"50%",background:sc,boxShadow:`0 0 6px ${sc}`}}/>
+                      <span style={{fontSize:12,fontWeight:700,color:sc,letterSpacing:2}}>{tfSignal.signal}</span>
+                    </div>
+                    <div style={{fontSize:11,color:"rgba(255,255,255,0.6)"}}>
+                      <span style={{color:sc,fontWeight:700}}>{tfSignal.confidence}%</span>
+                      <span style={{color:"rgba(255,255,255,0.3)",marginLeft:4}}>CONFIDENCE</span>
+                    </div>
+                    {tfSignal.rsi != null && (
+                      <div style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>RSI <span style={{color:"rgba(255,255,255,0.7)"}}>{tfSignal.rsi?.toFixed(1)}</span></div>
+                    )}
+                  </div>
+                  {tfSignal.rationale && (
+                    <div style={{fontSize:10,color:"rgba(255,255,255,0.45)",lineHeight:1.6,borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:8}}>
+                      {tfSignal.rationale}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* ── TABS ── */}
         {signal && !loading && timeframe==="day" && (
           <div style={{display:"flex",gap:2,marginBottom:12,background:themeObj.panel,borderRadius:6,padding:3,border:`1px solid ${themeObj.border}`,overflowX:"auto"}}>
@@ -2446,14 +2595,14 @@ INSTRUCTIONS:
           <>
             {/* ── SIGNAL TAB ── */}
             {activeTab==="signal" && (
-              <div style={{...S.card,border:"1px solid "+sigColor+"33",marginBottom:12}}>
+              <div style={{...S.card,border:`1px solid ${themeObj.accent}44`,borderTop:`2px solid ${themeObj.accent}`,marginBottom:12}}>
                 <div style={{display:"flex",flexDirection:isMobile?"column":"row",justifyContent:"space-between",alignItems:isMobile?"flex-start":"flex-start",gap:isMobile?10:0,marginBottom:14}}>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:isMobile?11:10,color:themeObj.muted,marginBottom:3}}>{signal.asset.name}</div>
                     <div style={{display:"flex",alignItems:"baseline",gap:isMobile?8:10,marginBottom:8,flexWrap:"wrap"}}>
                       <span style={{fontSize:isMobile?20:22,fontWeight:700,color:themeObj.text}}>{signal.asset.label}</span>
                       <span style={{fontSize:isMobile?15:18,color:"#8ab0cc"}}>{formatPrice(signal.asset)}</span>
-                      <span style={{fontSize:isMobile?13:12,fontWeight:700,color:signal.asset.change>=0?"#00ff88":"#ff4466"}}>{signal.asset.change>=0?"+":""}{signal.asset.change.toFixed(2)}%</span>
+                      <span style={{fontSize:isMobile?13:12,fontWeight:700,color:signal.asset.change>=0?themeObj.accentBuy:themeObj.accentSell}}>{signal.asset.change>=0?"+":""}{signal.asset.change.toFixed(2)}%</span>
                       {prices[signal.asset.label]?.source==="live" && (
                         <span style={{fontSize:9,color:"#1a3a5c",border:`1px solid ${themeObj.border}`,padding:"1px 6px",borderRadius:3}}>LIVE</span>
                       )}
@@ -2465,7 +2614,7 @@ INSTRUCTIONS:
                       </div>
                       {isMobile && (
                         <div style={{display:"flex",alignItems:"center",gap:10}}>
-                          <div style={{fontSize:32,fontWeight:700,color:sigColor,lineHeight:1}}>{signal.confidence}%</div>
+                          <div style={{fontSize:32,fontWeight:700,color:sigColor,lineHeight:1,whiteSpace:"nowrap",flexShrink:0}}>{signal.confidence}%</div>
                           <div>
                             <div style={{fontSize:9,color:themeObj.muted,letterSpacing:1}}>CONFIDENCE</div>
                             <div style={{width:80,height:3,background:"#0d2035",borderRadius:2,overflow:"hidden",marginTop:4}}>
@@ -2492,7 +2641,7 @@ INSTRUCTIONS:
                     ["STOP LEVEL",     formatPrice({...signal.asset,price:signal.stop}),       "protect capital","#ff4466"],
                     ["HERD STRENGTH",  signal.swarm.buy_pct+"%",                              "agents aligned","#00aaff"],
                   ].map(([l,v,s,c])=>(
-                    <div key={l} style={{background:themeObj.bg,border:`1px solid ${themeObj.border}`,borderRadius:6,padding:"10px 12px"}}>
+                    <div key={l} style={{background:themeObj.bg,border:`1px solid ${themeObj.border}`,borderLeft:`2px solid ${themeObj.accent}`,borderRadius:6,padding:"10px 12px"}}>
                       <div style={{...S.label}}>{l}</div>
                       <div style={{fontSize:15,fontWeight:700,color:themeObj.text,marginBottom:2}}>{v}</div>
                       <div style={{fontSize:10,color:c}}>{s}</div>
@@ -2544,6 +2693,44 @@ INSTRUCTIONS:
                     </div>
                   ))}
                 </div>
+
+                {/* ── LIVE NEWS FEED ── */}
+                <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"14px 16px",marginBottom:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:12}}>
+                    <div style={{width:7,height:7,borderRadius:"50%",background:"#ff4466",boxShadow:"0 0 8px #ff4466"}}/>
+                    <span style={{fontSize:9,color:"rgba(255,255,255,0.5)",letterSpacing:"0.2em",fontWeight:700}}>LIVE NEWS</span>
+                  </div>
+                  {assetNews.length === 0 ? (
+                    <div style={{fontSize:11,color:"rgba(255,255,255,0.2)",fontStyle:"italic"}}>No news available for {signal.asset.label}</div>
+                  ) : (
+                    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                      {assetNews.slice(0,5).map((n,i)=>{
+                        const sentColor = n.sentiment==="positive"?"#00ff88":n.sentiment==="negative"?"#ff4466":"#ffaa00";
+                        return (
+                          <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start",paddingBottom:i<Math.min(assetNews.length,5)-1?10:0,borderBottom:i<Math.min(assetNews.length,5)-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                            <div style={{width:7,height:7,borderRadius:"50%",background:sentColor,boxShadow:`0 0 5px ${sentColor}`,flexShrink:0,marginTop:4}}/>
+                            <div style={{flex:1,minWidth:0}}>
+                              {(n as any).url ? (
+                                <a href={(n as any).url} target="_blank" rel="noopener noreferrer" style={{fontSize:13,color:"rgba(255,255,255,0.8)",lineHeight:1.4,display:"block",textDecoration:"none",cursor:"pointer"}}
+                                  onMouseEnter={e=>(e.currentTarget.style.color="#00aaff")}
+                                  onMouseLeave={e=>(e.currentTarget.style.color="rgba(255,255,255,0.8)")}
+                                >{n.title}</a>
+                              ) : (
+                                <div style={{fontSize:13,color:"rgba(255,255,255,0.8)",lineHeight:1.4}}>{n.title}</div>
+                              )}
+                              <div style={{display:"flex",gap:8,marginTop:4,alignItems:"center"}}>
+                                <span style={{fontSize:11,color:"rgba(255,255,255,0.3)",fontFamily:"monospace"}}>{n.publisher}</span>
+                                {(n as any).published_at && <span style={{fontSize:11,color:"rgba(255,255,255,0.2)",fontFamily:"monospace"}}>· {(n as any).published_at}</span>}
+                                <span style={{fontSize:9,color:sentColor,letterSpacing:1,textTransform:"uppercase" as const}}>{n.sentiment}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 <div style={{marginBottom:12}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                     <span style={{fontSize:9,color:themeObj.muted,letterSpacing:2}}>MIRO FISH SWARM — LIVE</span>
