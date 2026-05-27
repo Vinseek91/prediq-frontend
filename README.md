@@ -1,4 +1,4 @@
-# 🕰️ PREDIQ Time Machine
+# 🕰️ PREDIQ AI Trading
 
 <div align="center">
 
